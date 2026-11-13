@@ -1,11 +1,11 @@
 import { PHASES, SLOTS, KITS, LANES, DRUM_ROWS, LOOP_BY_ID, type SlotId } from './config';
 import { newBattleRoom, battleSample } from './battle';
 import { normalizeBeat, canSubmit, loopIdsIn } from './beat';
-import { everyoneSampleReady, normalizeTags, pairKey, botVotes, botComments } from './game';
+import { automaticPairs, everyoneSampleReady, normalizeTags, pairKey, botVotes, botComments } from './game';
 import { createVoting } from './voting';
 import { playerBank } from './packs';
 import { allowedSongMedia, songEmbed } from './songs';
-import { appendChat, type ChatAuthor } from './chat';
+import { advanceBotChat, appendChat, type ChatAuthor } from './chat';
 import type { Beat, PlayerState, RoomState } from './types';
 
 /** Access keys are SHA-256 token digests online. They never enter a room response. */
@@ -92,7 +92,7 @@ function validatePlayerPatch(room: RoomState, slot: SlotId, path: string, value:
   if (field === 'name') { cleanName(value); return; }
   if (field === 'taste' && room.phase === 'taste' && isObject(value)) {
     if (Object.keys(value).some(key => !['song', 'tags', 'preview'].includes(key)) || typeof value.song !== 'string' || !value.song.trim() || value.song.length > 100 || !Array.isArray(value.tags) || value.tags.length !== 2 || value.tags.some(t => typeof t !== 'string' || t.length > 30) || normalizeTags(value.tags).length !== 2) throw new LobbyError('Add a song and two distinct vibe tags.');
-    if (value.preview && (!isObject(value.preview) || Object.keys(value.preview).some(key => !['provider', 'title', 'url', 'audio', 'art'].includes(key)) || typeof value.preview.title !== 'string' || value.preview.title.length > 200 || typeof value.preview.url !== 'string' || value.preview.url.length > 2000 || !songEmbed(value.preview as never) || (value.preview.audio !== undefined && !allowedSongMedia(value.preview.audio, 'audio')) || (value.preview.art !== undefined && !allowedSongMedia(value.preview.art, 'art')))) throw new LobbyError('Invalid song preview.');
+    if (value.preview && (!isObject(value.preview) || Object.keys(value.preview).some(key => !['provider', 'title', 'url', 'audio', 'art', 'artist', 'trackTitle', 'genre'].includes(key)) || typeof value.preview.title !== 'string' || value.preview.title.length > 200 || typeof value.preview.url !== 'string' || value.preview.url.length > 2000 || !songEmbed(value.preview as never) || (value.preview.audio !== undefined && !allowedSongMedia(value.preview.audio, 'audio')) || (value.preview.art !== undefined && !allowedSongMedia(value.preview.art, 'art')) || ['artist', 'trackTitle', 'genre'].some(key => value.preview && isObject(value.preview) && value.preview[key] !== undefined && (typeof value.preview[key] !== 'string' || (value.preview[key] as string).length > (key === 'genre' ? 100 : 200))))) throw new LobbyError('Invalid song preview.');
     return;
   }
   if (field === 'sampleReady' && room.phase === 'sample' && typeof value === 'boolean') return;
@@ -128,6 +128,7 @@ export function updateLobbyRecord(record: LobbyRecord, key: string, patch: Recor
     setPath(next.room as unknown as Record<string, unknown>, path, value);
   }
   if (!PHASES.includes(next.room.phase) || (next.room.phaseEndsAt != null && (!Number.isFinite(next.room.phaseEndsAt) || next.room.phaseEndsAt < 0)) || Object.keys(next.room.players).some(id => !SLOTS.some(s => s.id === id))) throw new LobbyError('Invalid room state.');
+  if (actor.role === 'host' && next.room.phase === 'flipback' && (!record.room.pairs || Object.keys(next.room.players).some(id => !record.room.pairs?.[id as SlotId]) || !Object.values(record.room.players).some(player => player?.flip))) next.room.pairs = automaticPairs(next.room);
   if (actor.role === 'host' && record.room.phase === 'sample' && next.room.phase === 'studio' && !everyoneSampleReady(next.room)) throw new LobbyError('Wait for at least three players and for everyone to ready up.');
   if (actor.role === 'host' && next.room.phase === 'vote' && !record.room.voting) {
     next.room.voting = createVoting(next.room);
@@ -168,4 +169,10 @@ export function removeLobbyPlayer(record: LobbyRecord, key: string, slot: SlotId
   for (const crewId of Object.keys(next.room.crewChats || {})) if (crewId.split('-').includes(slot)) delete next.room.crewChats![crewId];
   next.room.updatedAt = Math.max(Date.now(), record.room.updatedAt + 1);
   return next;
+}
+
+export function botChatLobbyRecord(record: LobbyRecord, key: string, battleId: string): LobbyRecord {
+  if (actorFor(record, key).role !== 'host') throw new LobbyError('Only the host can run demo players.', 403);
+  const room = advanceBotChat(record.room, battleId);
+  return room === record.room ? record : { ...record, room };
 }

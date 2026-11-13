@@ -1,6 +1,6 @@
 import { roomForChatMember } from '../chat';
 import { createHash } from 'node:crypto';
-import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, randomSecret, roomCode, type LobbyRecord } from '../lobbies';
+import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, botChatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, randomSecret, roomCode, type LobbyRecord } from '../lobbies';
 import type { Session } from '../session';
 import type { SlotId } from '../config';
 
@@ -86,6 +86,7 @@ export function lobbyHttp(repository: LobbyRepository) {
           if (request.method === 'PATCH') next = updateLobbyRecord(record, key, body.patch as Record<string, unknown>, typeof body.expectedBattleId === 'string' ? body.expectedBattleId : undefined);
           else if (request.method === 'POST' && body.action === 'reset') next = resetLobbyRecord(record, key);
           else if (request.method === 'POST' && body.action === 'chat' && typeof body.text === 'string' && typeof body.battleId === 'string') next = chatLobbyRecord(record, key, body.text, body.battleId, randomSecret(), typeof body.crewId === 'string' ? body.crewId : undefined);
+          else if (request.method === 'POST' && body.action === 'bot-chat' && typeof body.battleId === 'string') next = botChatLobbyRecord(record, key, body.battleId);
           else if (request.method === 'POST' && body.action === 'remove' && typeof body.slot === 'string') next = removeLobbyPlayer(record, key, body.slot as SlotId);
           else throw new LobbyError('Unknown room action.');
           return { record: next, result: { room: roomForChatMember(next.room, actorFor(next, key).slot || 'host') } };

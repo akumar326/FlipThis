@@ -1,3 +1,5 @@
+import { matchingGroups } from './matching';
+import { botFeedback, randomBotProfile } from './bots';
 import { BARS, LOOP_BARS, SLOTS, type SlotId } from './config';
 import type { RoomState } from './types';
 import { createVoting, votingBeat } from './voting';
@@ -47,23 +49,9 @@ export function normalizeTags(tags: string[]): string[] {
   return [...new Set(tags.map(t => t.normalize('NFKC').trim().replace(/^#+/, '').trim().replace(/\s+/g, ' ').toLowerCase()).filter(Boolean))];
 }
 
-/** Maximum shared-tag matching, using a memoized subset search (up to 20 seats). */
+/** Globally optimized taste matching for even-sized sets. */
 export function bestPairing(room: RoomState, slots = joinedSlots(room)): [SlotId, SlotId][] {
-  const memo = new Map<number, { score: number; pairs: [SlotId, SlotId][] }>();
-  function solve(mask: number): { score: number; pairs: [SlotId, SlotId][] } {
-    if (!mask) return { score: 0, pairs: [] };
-    const cached = memo.get(mask); if (cached) return cached;
-    let a = 0; while (!(mask & (1 << a))) a++;
-    let best = { score: -1, pairs: [] as [SlotId, SlotId][] };
-    for (let b = a + 1; b < slots.length; b++) {
-      if (!(mask & (1 << b))) continue;
-      const rest = solve(mask ^ (1 << a) ^ (1 << b));
-      const score = rest.score + tagOverlap(room, slots[a], slots[b]).length;
-      if (score > best.score) best = { score, pairs: [[slots[a], slots[b]], ...rest.pairs] };
-    }
-    memo.set(mask, best); return best;
-  }
-  return solve((1 << slots.length) - 1).pairs;
+  return matchingGroups(room, slots, false) as [SlotId, SlotId][];
 }
 
 export function pairsToMap(pairs: [SlotId, SlotId][]): Partial<Record<SlotId, SlotId>> {
@@ -72,19 +60,10 @@ export function pairsToMap(pairs: [SlotId, SlotId][]): Partial<Record<SlotId, Sl
   return m;
 }
 
-/** Even rooms form pairs; odd rooms add one taste-matched remix circle of three. */
+/** Similarity-based pairs, or one jointly optimized trio for odd rooms. */
 export function automaticPairs(room: RoomState): Partial<Record<SlotId, SlotId>> {
-  const slots = joinedSlots(room);
-  if (slots.length < 2) return {};
-  let trio: SlotId[] = [], best = -1;
-  if (slots.length % 2) {
-    for (let a = 0; a < slots.length; a++) for (let b = a + 1; b < slots.length; b++) for (let c = b + 1; c < slots.length; c++) {
-      const score = tagOverlap(room, slots[a], slots[b]).length + tagOverlap(room, slots[b], slots[c]).length + tagOverlap(room, slots[c], slots[a]).length;
-      if (score > best) { best = score; trio = [slots[a], slots[b], slots[c]]; }
-    }
-  }
-  const pairs = pairsToMap(bestPairing(room, slots.filter(s => !trio.includes(s))));
-  trio.forEach((s, i) => { pairs[s] = trio[(i + 1) % 3]; });
+  const pairs: Partial<Record<SlotId, SlotId>> = {};
+  for (const group of matchingGroups(room)) group.forEach((slot, i) => { pairs[slot] = group[(i + 1) % group.length]; });
   return pairs;
 }
 
@@ -143,7 +122,7 @@ export function botPlayer(slot: SlotId, room?: RoomState): PlayerState {
   const bank = room?.battle?.packs[slot] || randomBank();
   return upgradeDemoTaste({
     bank,
-    name: `${SLOT_BY_ID[slot].defaultName} (demo)`, joinedAt: Date.now(), bot: true, submitted: true,
+    name: `${SLOT_BY_ID[slot].defaultName} (demo)`, joinedAt: Date.now(), bot: true, botProfile: randomBotProfile(), submitted: true,
     beat: botBeat(slot, bank, room ? battleSample(room).loops : SHARED_LOOPS),
   }, slot);
 }
@@ -159,7 +138,7 @@ export function botVotes(room: RoomState, slot: SlotId): Record<string, SlotId> 
 export function botComments(room: RoomState, slot: SlotId): Partial<Record<SlotId, string>> {
   const comments: Partial<Record<SlotId, string>> = {};
   for (const pair of matchupsFor(room, slot)) for (const target of pair) {
-    comments[target] = 'Demo feedback: Try a quieter section before the ending to give the final bars more contrast.';
+    comments[target] = botFeedback(room, slot, target, votingBeat(room, target));
   }
   return comments;
 }

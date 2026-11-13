@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const results: SongPreview[] = [];
     for (const track of Array.isArray(data.results) ? data.results : []) {
       if (typeof track.trackName !== 'string' || typeof track.artistName !== 'string' || typeof track.trackViewUrl !== 'string') continue;
-      const preview: SongPreview = { provider: 'apple', title: `${track.artistName} – ${track.trackName}`, url: track.trackViewUrl, ...(allowedSongMedia(track.previewUrl, 'audio') ? { audio: track.previewUrl } : {}), ...(allowedSongMedia(track.artworkUrl100, 'art') ? { art: track.artworkUrl100.replace('100x100', '300x300') } : {}) };
+      const preview: SongPreview = { provider: 'apple', title: `${track.artistName} – ${track.trackName}`, url: track.trackViewUrl, artist: track.artistName.slice(0, 200), trackTitle: track.trackName.slice(0, 200), ...(typeof track.primaryGenreName === 'string' ? { genre: track.primaryGenreName.slice(0, 100) } : {}), ...(allowedSongMedia(track.previewUrl, 'audio') ? { audio: track.previewUrl } : {}), ...(allowedSongMedia(track.artworkUrl100, 'art') ? { art: track.artworkUrl100.replace('100x100', '300x300') } : {}) };
       if (songEmbed(preview)) results.push(preview);
     }
     const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];

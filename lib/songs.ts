@@ -4,6 +4,9 @@ export interface SongPreview {
   url: string;
   audio?: string;
   art?: string;
+  artist?: string;
+  trackTitle?: string;
+  genre?: string;
 }
 
 /** Only provider URLs are converted into embeds; never accept arbitrary frames. */

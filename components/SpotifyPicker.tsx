@@ -45,7 +45,7 @@ export function SpotifyPicker({ preview, onPick, onRemove }: {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {preview?.provider === 'spotify' && <div className="card stack">
-      <div className="row"><SongArt preview={preview} /><div className="grow stack"><strong>{preview.title}</strong>{genre && <span className="hint">{genre}</span>}</div><button type="button" className="btn btn-ghost btn-sm" onClick={clear}>Remove</button></div>
+      <div className="row"><SongArt preview={preview} /><div className="grow stack"><strong>{preview.title}</strong>{(genre || preview.genre) && <span className="hint">{genre || preview.genre}</span>}</div><button type="button" className="btn btn-ghost btn-sm" onClick={clear}>Remove</button></div>
       <PreviewPlayer preview={preview} />
     </div>}
   </div>;

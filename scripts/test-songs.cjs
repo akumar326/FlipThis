@@ -44,7 +44,7 @@ async function main() {
     };
     const response = await GET(request(url)); assert.equal(response.status, 200);
     const result = await response.json();
-    assert.equal(result.song, 'Artist – Song'); assert.equal(result.preview.audio, audio); assert.equal(result.preview.art, art);
+    assert.equal(result.song, 'Artist – Song'); assert.equal(result.preview.artist, 'Artist'); assert.equal(result.preview.genre, 'R&B/Soul'); assert.equal(result.preview.audio, audio); assert.equal(result.preview.art, art);
     assert.deepEqual(result.tags, ['r&b', 'late night']);
     let record = joinLobbyRecord(createLobbyRecord('ABCDEF', 'Test', 'Host', 'host'), 'Player', 'player').record;
     record = updateLobbyRecord(record, 'host', { phase: 'taste' });

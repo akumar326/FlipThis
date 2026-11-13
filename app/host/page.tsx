@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BATTLE_NAME, BPM, KEY_LABEL, PHASES, PHASE_LABELS, PHASE_MINUTES, SLOTS, type Phase, type SlotId } from '@/lib/config';
 import { sampleBars, normalizeBeat } from '@/lib/beat';
-import { everyoneSampleReady, sampleReady, automaticPairs, botComments, botFlip, botPlayer, botVotes, joinedSlots, playerName, standings, tagOverlap } from '@/lib/game';
+import { everyoneSampleReady, sampleReady, automaticPairs, botComments, botFlip, botPlayer, botVotes, joinedSlots, playerName, standings } from '@/lib/game';
 import { createVoting, eligibleSlots, votingBeat } from '@/lib/voting';
 import { clearSession, loadSession, invitePath, type Session } from '@/lib/session';
 import { useNow, useRoom, type Patch } from '@/lib/store';
@@ -14,6 +14,8 @@ import { BeatPlayer } from '@/components/Playback';
 import { LobbyInvite } from '@/components/LobbyInvite';
 import { SubmissionFeedback } from '@/components/Screens';
 import { SampleBriefing } from '@/components/SampleBriefing';
+import { tasteFit } from '@/lib/matching';
+import { botChatIsDue } from '@/lib/bots';
 import { RoomChat } from '@/components/RoomChat';
 
 const PHASE_HELP: Record<Phase, string> = {
@@ -43,6 +45,25 @@ export default function HostPage() {
     setSession(s);
     setOrigin(window.location.origin);
   }, [router]);
+
+  const botRoom = useRef(room); botRoom.current = room;
+  useEffect(() => {
+    if (!session || !store?.tickBots) return;
+    let busy = false;
+    const tick = async () => {
+      const current = botRoom.current;
+      if (busy || !current || !botChatIsDue(current)) return;
+      busy = true;
+      try { await store.tickBots!(current.battle?.id || 'legacy'); }
+      catch { /* The saved schedule can retry after reconnecting. */ }
+      finally { busy = false; }
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 4000);
+    return () => clearInterval(timer);
+  }, [session, store]);
+
+  const matches = useMemo(() => room ? room.pairs || automaticPairs(room) : {}, [room?.pairs, room?.players, room?.battle?.id]);
 
   if (!session || !room || !store) return <main className="page"><div className="chassis"><div className="panel big-center"><p>{error || 'Connecting to the room…'}</p>{error && <a className="btn btn-ghost" href={session?.roomId ? invitePath(session.roomId, session.transport) : '/'}>Return to lobby / reconnect</a>}</div></div></main>;
 
@@ -87,7 +108,6 @@ export default function HostPage() {
     store.update(patch);
   };
 
-  const matches = room.pairs || automaticPairs(room);
 
   return (
     <Chassis
@@ -176,13 +196,13 @@ export default function HostPage() {
       </section>
 
       <section className="panel">
-        <div className="panel-head"><h2>Automatic taste matches</h2><span className="hint">Shared tags are matched ignoring case, spacing, and leading # signs. Ties use seat order. Matches lock when Flip Back starts.</span></div>
+        <div className="panel-head"><h2>Automatic taste matches</h2><span className="hint">Matches use related vibe meanings plus the selected song, artist, and genre when available. The whole room is matched together; ties are shuffled consistently for this battle. Matches lock when Flip Back starts.</span></div>
         {joined.length < 2 ? <p className="hint">Waiting for at least two players.</p> : (
           <div className="card-list">
             {Object.entries(matches).map(([a, b]) => (
               <div key={a} className="card stack">
                 <span><strong>{playerName(room, a as SlotId)}</strong> remixes <strong>{playerName(room, b)}</strong></span>
-                <span className="hint">{tagOverlap(room, a as SlotId, b).length ? `Shared: ${tagOverlap(room, a as SlotId, b).join(', ')}` : 'Different tastes — a chance to try something new.'}</span>
+                <span className="hint">{tasteFit(room, a as SlotId, b).reasons.join(' · ') || 'No close overlap from the supplied tastes — a chance to try something new.'}</span>
               </div>
             ))}
           </div>

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getEngine } from '@/lib/audio';
 import { cloneBeat, normalizeBeat } from '@/lib/beat';
 import { LANES, LOOP_BY_ID, SLOTS, SLOT_BY_ID, SURVEY_URL, type LoopDef, type SlotId } from '@/lib/config';
-import { collaborationGroups, normalizeTags, joinedSlots, matchupsFor, pairKey, playerName, standings, tagOverlap } from '@/lib/game';
+import { collaborationGroups, normalizeTags, joinedSlots, matchupsFor, pairKey, playerName, standings } from '@/lib/game';
 import type { RoomStore } from '@/lib/store';
 import type { Beat, RoomState } from '@/lib/types';
 import { useSyncedBeat } from '@/lib/useSyncedBeat';
@@ -13,6 +13,7 @@ import { CheckIcon, PlayIcon } from './Icons';
 import { battleSample } from '@/lib/battle';
 import { playerBank } from '@/lib/packs';
 import type { SongPreview as Preview } from '@/lib/songs';
+import { tasteFit } from '@/lib/matching';
 import { BattleInstructions } from './PhaseInstructions';
 import { SpotifyPicker } from './SpotifyPicker';
 import { SongArt } from './TasteAudio';
@@ -102,7 +103,7 @@ export function TasteDrop({ room, store, slot }: PS) {
             </details>
             <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 10 }}>
               <legend>Write two vibe tags</legend>
-              <span className="hint">Suggested from the song’s genre — change them to your own words. Shared words help match you with someone who has a similar taste.</span>
+              <span className="hint">Suggested from the song’s genre — change them to your own words. Matching uses related meanings, not just identical tags, plus your selected song’s available artist and genre.</span>
               {[0, 1].map(i => <div className="field" key={i}>
                 <label htmlFor={`vibe-${i}`}>Vibe {i + 1}</label>
                 <input id={`vibe-${i}`} className="input" maxLength={30} value={tags[i] || ''} placeholder={i === 0 ? 'e.g. late night' : 'e.g. bouncy'}
@@ -266,7 +267,7 @@ export function SubmissionFeedback({ room, slot }: { room: RoomState; slot?: Slo
 }
 
 function MatchCard({ room, slot, partner }: P & { partner: SlotId }) {
-  const shared = tagOverlap(room, slot, partner);
+  const fit = tasteFit(room, slot, partner);
   const t = room.players[partner]?.taste;
   return (
     <section className="panel row" style={{ justifyContent: 'space-between', gap: 14 }}>
@@ -275,9 +276,7 @@ function MatchCard({ room, slot, partner }: P & { partner: SlotId }) {
         <div className="row" style={{ gap: 10 }}><SeatChip room={room} slot={partner} />{t && <span>dropped <strong>{t.song}</strong></span>}</div>
       </div>
       <div className="row" style={{ gap: 6 }}>
-        {shared.length ? <>
-          <span className="hint">You both picked</span>{shared.map((tg) => <span key={tg} className="tag tag-sm">{tg}</span>)}
-        </> : <span className="hint">Different tastes, different sounds: a good mix.</span>}
+        <span className="hint">{fit.reasons.join(' · ') || 'No close overlap from the supplied tastes — a chance to try something new.'}</span>
       </div>
     </section>
   );

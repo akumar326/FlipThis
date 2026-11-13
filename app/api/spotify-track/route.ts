@@ -45,6 +45,6 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* A playable Spotify embed remains available if Apple is offline. */ }
   const song = (artist ? `${artist} – ${title}` : title).slice(0, 100);
-  const preview: SongPreview = { provider: 'spotify', title: song, url: canonical, ...(audio ? { audio } : {}), ...(art ? { art } : {}) };
+  const preview: SongPreview = { provider: 'spotify', title: song, url: canonical, artist, trackTitle: title, ...(genre ? { genre } : {}), ...(audio ? { audio } : {}), ...(art ? { art } : {}) };
   return NextResponse.json({ song, title, artist, genre, tags: genreVibes(genre), preview }, { headers: { 'Cache-Control': 'no-store' } });
 }

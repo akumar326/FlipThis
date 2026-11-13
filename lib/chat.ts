@@ -1,3 +1,4 @@
+import { planBotChat } from './bots';
 import { collaborationGroups } from './game';
 import { PHASES, SLOTS, type Phase, type SlotId } from './config';
 import type { ChatMessage, RoomState } from './types';
@@ -24,6 +25,11 @@ export function appendChat(room: RoomState, author: ChatAuthor, text: string, ba
   const trimmed = text.trim();
   if (!trimmed) throw new Error('Write a message first.');
   if (trimmed.length > CHAT_MAX_LENGTH) throw new Error(`Keep messages to ${CHAT_MAX_LENGTH} characters.`);
+  return storeChat(room, author, trimmed, id, now, crewId);
+}
+
+function storeChat(room: RoomState, author: ChatAuthor, trimmed: string, id: string, now: number, crewId?: string): Partial<RoomState> {
+  const player = author === 'host' ? null : room.players[author];
   const history = crewId ? room.crewChats?.[crewId] : room;
   const sequence = (history?.chatSequence || 0) + 1;
   const message: ChatMessage = { id, author, name: author === 'host' ? 'Facilitator' : player!.name, text: trimmed, phase: room.phase, sequence, createdAt: now };
@@ -48,4 +54,18 @@ export function roomForChatMember(room: RoomState, author: ChatAuthor): RoomStat
   const { crewChats, ...publicRoom } = room;
   const crewId = crewFor(room, author)?.join('-');
   return crewId && crewChats?.[crewId] ? { ...publicRoom, crewChats: { [crewId]: crewChats[crewId] } } : publicRoom;
+}
+
+/** Only the authenticated host action (or trusted classic demo) calls this. */
+export function advanceBotChat(room: RoomState, battleId: string, now = Date.now()): RoomState {
+  if ((room.battle?.id || 'legacy') !== battleId) return room;
+  const plan = planBotChat(room, now);
+  if (!plan) return room;
+  const next = { ...room, botChatState: plan.state, updatedAt: Math.max(now, room.updatedAt + 1) };
+  if (!plan.message) return next;
+  const id = `bot-${battleId}-${room.phase}-${plan.state.sent}`;
+  const patch = storeChat(room, plan.message.author, plan.message.text, id, now);
+  const chat = patch.chat!;
+  chat[id] = { ...chat[id], bot: true };
+  return { ...next, ...patch };
 }

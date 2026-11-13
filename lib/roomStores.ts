@@ -1,6 +1,6 @@
 'use client';
 import { roomForChatMember } from './chat';
-import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, roomCode, randomSecret, type LobbyRecord } from './lobbies';
+import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, botChatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, roomCode, randomSecret, type LobbyRecord } from './lobbies';
 import type { Session } from './session';
 import type { RoomStore, Patch } from './store';
 import type { RoomState } from './types';
@@ -81,6 +81,7 @@ function localLobbyStore(code: string, token: string): RoomStore {
     subscribe(cb, onError) { listeners.add(cb); if (onError) errors.add(onError); refresh(); return () => { listeners.delete(cb); if (onError) errors.delete(onError); }; },
     update(patch, battleId) { return change(record => updateLobbyRecord(record, token, patch, battleId)); },
     reset() { return change(record => resetLobbyRecord(record, token)); },
+    tickBots(battleId) { return change(record => botChatLobbyRecord(record, token, battleId)); },
     removePlayer(slot) { return change(record => removeLobbyPlayer(record, token, slot)); },
     sendChat(_author, text, battleId, crewId) { return change(record => chatLobbyRecord(record, token, text, battleId, randomSecret(), crewId)); },
   };
@@ -125,6 +126,7 @@ function onlineLobbyStore(code: string, token: string): RoomStore {
     },
     update(patch: Patch, expectedBattleId?: string) { return change({ patch, expectedBattleId }, 'PATCH'); },
     reset() { return change({ action: 'reset' }); },
+    tickBots(battleId) { return change({ action: 'bot-chat', battleId }); },
     removePlayer(slot: SlotId) { return change({ action: 'remove', slot }); },
     sendChat(_author, text, battleId, crewId) { return change({ action: 'chat', text, battleId, crewId }); },
   };

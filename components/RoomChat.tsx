@@ -62,6 +62,7 @@ export function RoomChat({ room, store, author, crew = false }: { room: RoomStat
         <div className="row chat-message-head">
           <span className="dot" style={{ background: message.author === 'host' ? 'var(--ink)' : SLOT_BY_ID[message.author].color }} />
           <strong>{message.name}</strong>
+          {message.bot && <span className="hint">demo bot</span>}
           {message.author === author && <span className="hint">you</span>}
           <span className="hint">{PHASE_LABELS[message.phase]}</span>
         </div>

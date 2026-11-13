@@ -1,4 +1,5 @@
 import type { BankId, DrumRow, KitId, LaneId, Phase, SlotId } from './config';
+import type { BotProfile } from './bots';
 import type { SongPreview } from './songs';
 
 /** A beat is plain data so it can be synced, voted on and flipped. */
@@ -36,6 +37,7 @@ export interface PlayerState {
   teamUp?: boolean | null;
   /** Demo player filled in by the host when rehearsing without enough people. */
   bot?: boolean;
+  botProfile?: BotProfile;
   demoTasteVersion?: number;
 }
 
@@ -49,6 +51,7 @@ export interface RoomState {
   lobby?: { code: string; name: string; hostName: string; createdAt: number };
   chat?: Record<string, ChatMessage>;
   chatSequence?: number;
+  botChatState?: { phase: Phase; sent: number; nextAt: number };
   crewChats?: Record<string, { chat: Record<string, ChatMessage>; chatSequence: number }>;
   battle?: BattleSetup;
   voting?: VotingState;
@@ -62,6 +65,7 @@ export interface RoomState {
 }
 
 export interface ChatMessage {
+  bot?: boolean;
   id: string;
   author: SlotId | 'host';
   name: string;

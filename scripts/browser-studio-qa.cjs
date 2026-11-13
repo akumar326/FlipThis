@@ -27,6 +27,7 @@ async function main() {
     await host.getByLabel('Lobby name').fill('Studio rehearsal');
     await host.getByLabel('Your name', { exact: true }).fill('Host');
     await host.getByRole('button', { name: 'Create lobby and host' }).click();
+    await expect(host.getByLabel('Lobby invite link')).toHaveValue(/^https?:\/\//);
     const invite = await host.getByLabel('Lobby invite link').inputValue();
     for (const [page, name] of [[player, 'Maya'], [peer, 'Rae']]) {
       await page.goto(invite); await page.getByLabel('Your name', { exact: true }).fill(name);
@@ -38,6 +39,8 @@ async function main() {
     await player.getByLabel('Your message', { exact: true }).press('Space');
     assert.equal(await player.getByLabel('Your message', { exact: true }).inputValue(), 'hello ');
     await host.getByRole('button', { name: 'Fill to 4 with demo players', exact: true }).click();
+    await player.locator('.chat-message').filter({ hasText: '(demo)' }).first().waitFor({ timeout: 22000 });
+    assert.equal(await player.locator('.chat-message').filter({ hasText: '(demo)' }).count(), 1, 'demo chat is paced instead of a burst');
     await host.getByRole('button', { name: 'Next: Taste Drop', exact: true }).click();
     for (const page of [player, peer]) {
       await page.getByLabel('Spotify song link', { exact: true }).fill(spotify);
@@ -98,6 +101,8 @@ async function main() {
     assert.equal(await player.getByLabel('Your message', { exact: true }).inputValue(), 'Nice ');
     await host.getByRole('button', { name: 'Next: Flip Back', exact: true }).click();
     await player.getByRole('button', { name: 'Done', exact: true }).waitFor();
+    await player.locator('section').filter({ has: player.getByText('Your match', { exact: true }) }).getByText('Rae', { exact: true }).waitFor();
+    await player.getByText('Same artist: John Legend', { exact: false }).first().waitFor();
     assert.ok(await player.getByRole('group', { name: 'Chords lane', exact: true }).locator('.sound-pill').count() >= 2, 'partner’s sounds are available alongside your own');
     const before = await cell(player, 'sample', 1).getAttribute('aria-pressed');
     await cell(player, 'sample', 1).click();
@@ -106,7 +111,7 @@ async function main() {
     await expect(cell(player, 'sample', 1)).toBeDisabled();
     await player.screenshot({ path: '/private/tmp/flipthis-studio-updated.png', fullPage: true });
     assert.deepEqual(errors, [], 'no uncaught errors');
-    console.log('PASS: local host + players, real Spotify auto-fill, editable vibes, exclusive clip play/pause, click/remove, paint/erase, keyboard, restart, submit lock, and Flip Back.');
+    console.log('PASS: local host + players, friendly scheduled bot chat, real Spotify auto-fill, editable vibes, exclusive clip play/pause, click/remove, paint/erase, keyboard, restart, submit lock, and Flip Back.');
     await context.close();
   } finally { await browser.close(); }
 }

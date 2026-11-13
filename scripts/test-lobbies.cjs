@@ -3,7 +3,7 @@ const loader = require('./load-typescript.cjs');
 const load = loader();
 const { lobbyHttp } = load('lib/server/lobbyHttp.ts');
 const { SLOTS } = load('lib/config.ts');
-const { botBeat, matchupsFor, pairKey, automaticPairs, standings } = load('lib/game.ts');
+const { botPlayer, botBeat, matchupsFor, pairKey, automaticPairs, standings } = load('lib/game.ts');
 const { battleSample } = load('lib/battle.ts');
 const { feedbackFor, votePatch } = load('lib/voting.ts');
 const clone = value => structuredClone(value);
@@ -150,6 +150,15 @@ async function main() {
     await call(crewCode, 'POST', { action: 'reset' }, lobby.session.token);
     assert.equal((await call(crewCode, 'GET', null, people[0].token)).room.crewChats, undefined);
   }
+  const botLobby = await create('Demo chat'), botCode = botLobby.session.roomId;
+  const human = (await call(botCode, 'POST', { action: 'join', name: 'Human' })).session;
+  const action = { action: 'bot-chat', battleId: botLobby.room.battle.id };
+  assert.equal((await call(botCode, 'POST', action, human.token)).status, 403);
+  await call(botCode, 'PATCH', { patch: { 'players.p2': botPlayer('p2', botLobby.room) } }, botLobby.session.token);
+  const scheduled = await call(botCode, 'POST', action, botLobby.session.token);
+  assert.equal(scheduled.status, 200);
+  assert.ok(scheduled.room.botChatState.nextAt > Date.now());
+  assert.equal((await call(botCode, 'POST', action, botLobby.session.token)).room.chat, undefined, 'repeated host requests respect the initial delay');
   console.log('PASS: real lobby HTTP handlers, isolated rooms, 22 concurrent joins with a 20-player cap, private host access, phase/seat authorization, reconnects, voting, feedback, chat, remixes, reset and stale-save protection.');
 }
 const keepAlive = setInterval(() => {}, 1000);

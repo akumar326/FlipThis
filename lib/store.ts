@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ROOM_ID, SLOTS } from './config';
 import { upgradeDemoTaste } from './demoTaste';
 import { newBattleRoom } from './battle';
-import { appendChat, chatMessageId, type ChatAuthor } from './chat';
+import { advanceBotChat, appendChat, chatMessageId, type ChatAuthor } from './chat';
 import { loadSession } from './session';
 import { getLobbyStore } from './roomStores';
 import { EMPTY_ROOM, type RoomState } from './types';
@@ -20,6 +20,7 @@ export type Patch = Record<string, unknown>;
 export interface RoomStore {
   mode: 'online' | 'local';
   subscribe(cb: (room: RoomState) => void, onError?: (error: Error) => void): () => void;
+  tickBots?(battleId: string): Promise<void>;
   removePlayer?(slot: import('./config').SlotId): Promise<void>;
   update(patch: Patch, expectedBattleId?: string): Promise<void>;
   reset(): Promise<void>;
@@ -95,6 +96,7 @@ function createLocalStore(): RoomStore {
       write(withDefaults(r as unknown as RoomState));
       });
     },
+    async tickBots(battleId) { await mutate(() => { const room = read(); const next = advanceBotChat(room, battleId); if (next !== room) write(next); }); },
     async reset() { await mutate(() => write(newBattleRoom(read()))); },
     async sendChat(author, text, battleId, crewId) {
       const id = chatMessageId();
