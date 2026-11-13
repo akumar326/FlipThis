@@ -16,6 +16,7 @@ import { Lobby, TasteDrop, Vote, Reveal, FlipBack, TeamUp, Done, SubmissionFeedb
 import { MIN_SAMPLE_BARS } from '@/lib/config';
 import { battleSample } from '@/lib/battle';
 import { CheckIcon } from '@/components/Icons';
+import { PhaseInstructions } from '@/components/PhaseInstructions';
 import { SampleBriefing } from '@/components/SampleBriefing';
 import { RoomChat } from '@/components/RoomChat';
 
@@ -82,6 +83,7 @@ export default function PlayPage() {
       </>}
     >
       {error && <p className="error" role="alert">{error} Your work stays on this device while the connection recovers.</p>}
+      <PhaseInstructions phase={room.phase} />
       <PhaseView room={room} store={store} slot={slot} />
       <RoomChat key={`crew-${room.battle?.id || 'legacy'}`} room={room} store={store} author={slot} crew />
       <RoomChat key={room.battle?.id || 'legacy'} room={room} store={store} author={slot} />

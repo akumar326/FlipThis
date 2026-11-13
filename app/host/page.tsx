@@ -121,6 +121,7 @@ export default function HostPage() {
           <h2>Run the battle</h2>
           <span className="hint">Phase timers are a guide. Nothing moves until you press Next.</span>
         </div>
+        <p className="hint">This is the host panel — it runs the battle but has no studio. Want to play too? Open the invite link in another tab and join with your name.</p>
         <div className="row">
           <button type="button" className="btn" disabled={idx === 0} onClick={() => goTo(PHASES[idx - 1])}>Back</button>
           <button type="button" className="btn btn-primary" disabled={idx === PHASES.length - 1 || (room.phase === 'sample' && !everyoneSampleReady(room)) || (room.phase === 'studio' && !room.voting && eligibleSlots(room).length < 3)} onClick={() => goTo(PHASES[idx + 1])}>

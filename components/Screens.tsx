@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getEngine } from '@/lib/audio';
 import { cloneBeat, normalizeBeat } from '@/lib/beat';
-import { LANES, SLOTS, SLOT_BY_ID, SURVEY_URL, type LoopDef, type SlotId } from '@/lib/config';
+import { LANES, LOOP_BY_ID, SLOTS, SLOT_BY_ID, SURVEY_URL, type LoopDef, type SlotId } from '@/lib/config';
 import { collaborationGroups, normalizeTags, joinedSlots, matchupsFor, pairKey, playerName, standings, tagOverlap } from '@/lib/game';
 import type { RoomStore } from '@/lib/store';
 import type { Beat, RoomState } from '@/lib/types';
@@ -13,6 +13,9 @@ import { CheckIcon, PlayIcon } from './Icons';
 import { battleSample } from '@/lib/battle';
 import { playerBank } from '@/lib/packs';
 import type { SongPreview as Preview } from '@/lib/songs';
+import { BattleInstructions } from './PhaseInstructions';
+import { SpotifyPicker } from './SpotifyPicker';
+import { SongArt } from './TasteAudio';
 import { SongPicker, SongPreview } from './SongPreview';
 import { feedbackFor, votePatch, votingBeat } from '@/lib/voting';
 import { PHASES } from '@/lib/config';
@@ -53,6 +56,7 @@ export function Lobby({ room, slot }: P) {
         <p>{joined.length} of {SLOTS.length} players here. The battle starts when the host is ready. Grab headphones and get to know your sounds.</p>
         <div className="row" style={{ justifyContent: 'center' }}>{joined.map((s) => <SeatChip key={s} room={room} slot={s} />)}</div>
       </section>
+      <BattleInstructions />
       <section className="panel">
         <div className="panel-head"><h2>Your sounds</h2><span className="hint">Everyone shares this battle’s main sample. {room.battle ? 'Your complementary pack is unique to you in this battle.' : 'Start a new battle to get unique packs.'}</span></div>
         <LoopList loops={[...battleSample(room).loops, ...bank.loops]} />
@@ -88,14 +92,17 @@ export function TasteDrop({ room, store, slot }: PS) {
         <section className="panel">
           <form className="stack" style={{ gap: 18, maxWidth: 640 }} onSubmit={save} noValidate>
             <h2 style={{ fontSize: 20 }}>Drop one song that defines your taste</h2>
+            <SpotifyPicker preview={preview} onPick={(title, suggestions, picked) => { setSong(title); setTags(suggestions); setPreview(picked); setError(''); }} onRemove={() => setPreview(undefined)} />
             <div className="field">
               <label htmlFor="song">Song</label>
-              <input id="song" className="input" value={song} maxLength={100} placeholder="Artist – Title" onChange={(e) => { setSong(e.target.value); setPreview(undefined); setError(''); }} />
+              <input id="song" className="input" value={song} maxLength={100} placeholder="Artist – Title" onChange={(e) => { setSong(e.target.value); setError(''); }} />
             </div>
+            <details><summary>No Spotify? Search the song or paste a YouTube / Apple Music link</summary>
             <SongPicker song={song} preview={preview} onPick={selected => { setPreview(selected); if (selected) setSong(selected.title.slice(0, 100)); }} />
+            </details>
             <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 10 }}>
               <legend>Write two vibe tags</legend>
-              <span className="hint">Describe the music in your own words. Matching ignores capitals, extra spaces, and # signs; use shared words to find similar tastes.</span>
+              <span className="hint">Suggested from the song’s genre — change them to your own words. Shared words help match you with someone who has a similar taste.</span>
               {[0, 1].map(i => <div className="field" key={i}>
                 <label htmlFor={`vibe-${i}`}>Vibe {i + 1}</label>
                 <input id={`vibe-${i}`} className="input" maxLength={30} value={tags[i] || ''} placeholder={i === 0 ? 'e.g. late night' : 'e.g. bouncy'}
@@ -113,13 +120,14 @@ export function TasteDrop({ room, store, slot }: PS) {
         </section>
       )}
       <section className="panel">
-        <div className="panel-head"><h2>Taste wall</h2><span className="hint">{wall.length} of {joinedSlots(room).length} dropped</span></div>
+        <div className="panel-head"><h2>Taste wall</h2><span className="hint">{wall.length} of {joinedSlots(room).length} dropped · press play to hear someone’s pick</span></div>
         <div className="card-list">
           {wall.map((s) => {
             const t = room.players[s]!.taste!;
             return (
               <div key={s} className="card stack" style={{ gap: 8, borderColor: s === slot ? 'var(--ink)' : undefined }}>
                 <SeatChip room={room} slot={s} />
+                <SongArt preview={t.preview} />
                 <strong style={{ fontSize: 15 }}>{t.song}</strong>
                 <SongPreview key={t.preview?.url} preview={t.preview} />
                 <div className="row" style={{ gap: 6 }}>{t.tags.map((tg) => <span key={tg} className="tag tag-sm">{tg}</span>)}</div>
@@ -294,7 +302,7 @@ function FlipEditor({ room, store, slot, partner }: PS & { partner: SlotId }) {
   const [beat, setBeat, replace, cancelSave] = useSyncedBeat(start, (b) => store.update({ [`players.${slot}.flip`]: { of: partner, beat: b, edits: editsRef.current, done: false } }, room.battle?.id), done ? undefined : `flipthis.draft.${room.lobby?.code || 'demo'}.${room.battle?.id || 'legacy'}.${slot}.flip.${partner}`);
   const bank = playerBank(room.players[slot], slot, room);
 
-  const onChange = (b: Beat) => { setEdits(edits + 1); editsRef.current = edits + 1; setBeat(b); };
+  const onChange = (b: Beat) => { editsRef.current += 1; setEdits(editsRef.current); setBeat(b); };
   const resetAll = () => { setEdits(0); editsRef.current = 0; replace(cloneBeat(original)); store.update({ [`players.${slot}.flip`]: { of: partner, beat: original, edits: 0, done: false } }); };
   const finish = () => { stopAll(); cancelSave(); store.update({ [`players.${slot}.flip`]: { of: partner, beat, edits, done: true } }); };
 
@@ -311,7 +319,7 @@ function FlipEditor({ room, store, slot, partner }: PS & { partner: SlotId }) {
     <>
       <MatchCard room={room} slot={slot} partner={partner} />
       <Studio playKey={`flip-${slot}`} beat={beat} onChange={onChange} canEdit={!done} actions={actions}
-        loops={[...battleSample(room).loops, ...bank.loops]} loopsTitle={`Flip ${playerName(room, partner)}’s beat`}
+        loops={[...battleSample(room).loops, ...bank.loops, ...Object.values(original.place).flatMap(bars => Object.values(bars)).map(id => LOOP_BY_ID[id]).filter(Boolean)]} loopsTitle={`Flip ${playerName(room, partner)}’s beat`}
         loopsHint="Add your sounds to their beat. Unlimited edits — press Done when you’re ready." />
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { linkedSong, songEmbed, type SongPreview as Preview } from '@/lib/songs';
+import { allowedSongMedia, linkedSong, songEmbed, type SongPreview as Preview } from '@/lib/songs';
+import { TasteAudio, stopTasteAudio } from './TasteAudio';
 import { stopAll } from './Playback';
 
 // A single open provider player avoids several taste-wall songs playing at once.
@@ -14,16 +15,18 @@ export function SongPreview({ preview }: { preview?: Preview }) {
   const embed = preview && songEmbed(preview);
   if (!preview || !embed) return null;
   return <div className="stack song-preview">
+    {allowedSongMedia(preview.audio, 'audio') && <TasteAudio preview={preview} />}
     <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+      stopTasteAudio();
       stopAll();
       window.dispatchEvent(new Event('flipthis:close-song-previews'));
       setOpen(!open);
     }} aria-expanded={open}>
       {open ? 'Close preview' : 'Listen to song'}
     </button>
-    {open && <iframe title={`Song preview: ${preview.title}`} src={embed} height={preview.provider === 'youtube' ? 210 : 175}
+    {open && <iframe title={`Song preview: ${preview.title}`} src={embed} height={preview.provider === 'youtube' ? 210 : preview.provider === 'spotify' ? 152 : 175}
       style={{ width: '100%', border: 0, borderRadius: 12 }} allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />}
-    {open && <span className="hint">Preview won’t play? <a href={preview.url} target="_blank" rel="noreferrer">Open on {preview.provider === 'apple' ? 'Apple Music' : 'YouTube'}</a>.</span>}
+    {open && <span className="hint">Preview won’t play? <a href={preview.url} target="_blank" rel="noreferrer">Open on {preview.provider === 'apple' ? 'Apple Music' : preview.provider === 'spotify' ? 'Spotify' : 'YouTube'}</a>.</span>}
   </div>;
 }
 

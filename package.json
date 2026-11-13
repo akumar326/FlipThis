@@ -10,9 +10,10 @@
     "prepare-loops": "node scripts/prepare-loops.mjs",
     "generate-drums": "node scripts/generate-drums.mjs",
     "generate-loops": "node scripts/generate-loops.mjs",
-    "test": "node scripts/test-prototype.cjs && node scripts/test-lobbies.cjs",
+    "test": "node scripts/test-prototype.cjs && node scripts/test-lobbies.cjs && node scripts/test-songs.cjs",
     "test:browser": "node scripts/browser-qa.cjs",
-    "test:firebase": "node scripts/test-firebase.cjs"
+    "test:firebase": "node scripts/test-firebase.cjs",
+    "test:studio-browser": "node scripts/browser-studio-qa.cjs"
   },
   "dependencies": {
     "firebase-admin": "^14.5.1",

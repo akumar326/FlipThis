@@ -127,7 +127,7 @@ async function main() {
     assert.equal(readyResponse.status, 200);
     await phase(host, 'Flip');
     await maya.getByRole('heading', { name: 'Arrangement · 16 bars' }).waitFor();
-    await maya.locator('.loop-card').first().click();
+    await maya.locator('.sound-pill').first().click();
     await maya.getByRole('button', { name: /Place .* in Sample bar 1$/ }).click();
     await maya.getByRole('button', { name: /Place .* in Sample bar 2$/ }).click();
     await maya.getByRole('button', { name: '16 steps', exact: true }).click();
@@ -154,16 +154,16 @@ async function main() {
     await maya.getByRole('button', { name: 'Stop beat and return to start', exact: true }).click();
 
     await maya.reload();
-    await maya.getByRole('heading', { name: 'Drum sequencer · 16 steps' }).waitFor();
+    await maya.getByRole('heading', { name: 'Drum loop · 16 steps' }).waitFor();
     assert.equal((await identity(maya)).slot, m.slot);
     offline.add(mayaContext);
-    await maya.locator('.loop-card').first().click();
+    await maya.locator('.sound-pill').first().click();
     await maya.getByRole('button', { name: /Place .* in Sample bar 3$/ }).click();
     await maya.waitForTimeout(600);
     assert.ok(await maya.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('flipthis.draft.'))), 'offline drafts are stored on the device');
     offline.delete(mayaContext);
     await maya.reload();
-    await maya.getByRole('heading', { name: 'Drum sequencer · 16 steps' }).waitFor();
+    await maya.getByRole('heading', { name: 'Drum loop · 16 steps' }).waitFor();
     await waitFor(() => !!records.get(m.roomId).room.players[m.slot].beat?.place.sample['2'], 'offline draft recovery after reload');
     await maya.getByRole('button', { name: 'Submit beat', exact: true }).click();
     for (const session of [r, third]) {

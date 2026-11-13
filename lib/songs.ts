@@ -1,11 +1,17 @@
 export interface SongPreview {
-  provider: 'apple' | 'youtube';
+  provider: 'apple' | 'youtube' | 'spotify';
   title: string;
   url: string;
+  audio?: string;
+  art?: string;
 }
 
 /** Only provider URLs are converted into embeds; never accept arbitrary frames. */
 export function songEmbed(preview: SongPreview): string | null {
+  if (preview.provider === 'spotify') {
+    const id = spotifyTrackId(preview.url);
+    return id ? `https://open.spotify.com/embed/track/${id}` : null;
+  }
   try {
     const url = new URL(preview.url);
     if (url.protocol !== 'https:') return null;
@@ -38,4 +44,27 @@ export function linkedSong(value: string, title: string): SongPreview | null {
     if (songEmbed(preview)) return preview;
   }
   return null;
+}
+
+
+export function spotifyTrackId(value: string): string | null {
+  const text = value.trim();
+  const uri = /^spotify:track:([A-Za-z0-9]{22})$/.exec(text);
+  if (uri) return uri[1];
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'https:' || url.hostname !== 'open.spotify.com' || url.port || url.username || url.password) return null;
+    return /^\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]{22})\/?$/.exec(url.pathname)?.[1] || null;
+  } catch { return null; }
+}
+
+export function allowedSongMedia(value: unknown, kind: 'audio' | 'art'): value is string {
+  if (typeof value !== 'string' || value.length > 2000) return false;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+    const host = url.hostname;
+    const apple = host === 'itunes.apple.com' || host.endsWith('.itunes.apple.com') || host === 'mzstatic.com' || host.endsWith('.mzstatic.com');
+    return apple || (kind === 'audio' ? host === 'p.scdn.co' : host === 'i.scdn.co' || host === 'spotifycdn.com' || host.endsWith('.spotifycdn.com'));
+  } catch { return false; }
 }

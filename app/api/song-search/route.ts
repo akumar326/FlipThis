@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { songEmbed, type SongPreview } from '@/lib/songs';
+import { allowedSongMedia, songEmbed, type SongPreview } from '@/lib/songs';
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q')?.trim() || '';
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const results: SongPreview[] = [];
     for (const track of Array.isArray(data.results) ? data.results : []) {
       if (typeof track.trackName !== 'string' || typeof track.artistName !== 'string' || typeof track.trackViewUrl !== 'string') continue;
-      const preview: SongPreview = { provider: 'apple', title: `${track.artistName} – ${track.trackName}`, url: track.trackViewUrl };
+      const preview: SongPreview = { provider: 'apple', title: `${track.artistName} – ${track.trackName}`, url: track.trackViewUrl, ...(allowedSongMedia(track.previewUrl, 'audio') ? { audio: track.previewUrl } : {}), ...(allowedSongMedia(track.artworkUrl100, 'art') ? { art: track.artworkUrl100.replace('100x100', '300x300') } : {}) };
       if (songEmbed(preview)) results.push(preview);
     }
     const tokens = query.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];

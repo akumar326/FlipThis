@@ -41,10 +41,17 @@ export async function toggleStudioPlayback(key: string, beat: Beat) {
 }
 
 export async function playBeat(key: string, beat: Beat) {
+  window.dispatchEvent(new Event('flipthis:stop-song-audio'));
+  window.dispatchEvent(new Event('flipthis:close-song-previews'));
   const engine = getEngine();
   if (current === key) { engine.stop(); setCurrent(null); return; }
   setCurrent(key);
   await engine.play(beat);
+}
+
+export async function restartBeat(key: string, beat: Beat) {
+  stopAll();
+  await playBeat(key, beat);
 }
 
 export function stopAll() { getEngine().stop(); setCurrent(null); }

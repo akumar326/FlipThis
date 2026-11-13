@@ -4,7 +4,7 @@ import { normalizeBeat, canSubmit, loopIdsIn } from './beat';
 import { everyoneSampleReady, normalizeTags, pairKey, botVotes, botComments } from './game';
 import { createVoting } from './voting';
 import { playerBank } from './packs';
-import { songEmbed } from './songs';
+import { allowedSongMedia, songEmbed } from './songs';
 import { appendChat, type ChatAuthor } from './chat';
 import type { Beat, PlayerState, RoomState } from './types';
 
@@ -92,7 +92,7 @@ function validatePlayerPatch(room: RoomState, slot: SlotId, path: string, value:
   if (field === 'name') { cleanName(value); return; }
   if (field === 'taste' && room.phase === 'taste' && isObject(value)) {
     if (Object.keys(value).some(key => !['song', 'tags', 'preview'].includes(key)) || typeof value.song !== 'string' || !value.song.trim() || value.song.length > 100 || !Array.isArray(value.tags) || value.tags.length !== 2 || value.tags.some(t => typeof t !== 'string' || t.length > 30) || normalizeTags(value.tags).length !== 2) throw new LobbyError('Add a song and two distinct vibe tags.');
-    if (value.preview && (!isObject(value.preview) || Object.keys(value.preview).some(key => !['provider', 'title', 'url'].includes(key)) || typeof value.preview.title !== 'string' || value.preview.title.length > 200 || typeof value.preview.url !== 'string' || value.preview.url.length > 2000 || !songEmbed(value.preview as never))) throw new LobbyError('Invalid song preview.');
+    if (value.preview && (!isObject(value.preview) || Object.keys(value.preview).some(key => !['provider', 'title', 'url', 'audio', 'art'].includes(key)) || typeof value.preview.title !== 'string' || value.preview.title.length > 200 || typeof value.preview.url !== 'string' || value.preview.url.length > 2000 || !songEmbed(value.preview as never) || (value.preview.audio !== undefined && !allowedSongMedia(value.preview.audio, 'audio')) || (value.preview.art !== undefined && !allowedSongMedia(value.preview.art, 'art')))) throw new LobbyError('Invalid song preview.');
     return;
   }
   if (field === 'sampleReady' && room.phase === 'sample' && typeof value === 'boolean') return;
