@@ -28,11 +28,12 @@ export const PHASE_MINUTES: Partial<Record<Phase, number>> = {
   teamup: 2,
 };
 
-export type Phase = 'lobby' | 'taste' | 'studio' | 'vote' | 'reveal' | 'flipback' | 'teamup' | 'done';
-export const PHASES: Phase[] = ['lobby', 'taste', 'studio', 'vote', 'reveal', 'flipback', 'teamup', 'done'];
+export type Phase = 'lobby' | 'taste' | 'sample' | 'studio' | 'vote' | 'reveal' | 'flipback' | 'teamup' | 'done';
+export const PHASES: Phase[] = ['lobby', 'taste', 'sample', 'studio', 'vote', 'reveal', 'flipback', 'teamup', 'done'];
 export const PHASE_LABELS: Record<Phase, string> = {
   lobby: 'Lobby',
   taste: 'Taste Drop',
+  sample: 'Battle Sample',
   studio: 'Flip',
   vote: 'Vote',
   reveal: 'Reveal',

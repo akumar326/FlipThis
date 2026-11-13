@@ -65,6 +65,12 @@ async function main() {
   assert.equal((await call(code, 'PATCH', { patch: { [`players.${own.slot}.taste`]: { song: 'My favorite song', tags: ['quiet wonder', 'shared joy'] } } }, own.token)).status, 200);
   assert.equal((await call(code, 'POST', { action: 'chat', text: 'Wrong phase', battleId: first.room.battle.id }, own.token)).status, 400);
   assert.equal((await call(code, 'PATCH', { patch: { [`players.${own.slot}.submitted`]: true } }, own.token)).status, 403);
+  assert.equal((await call(code, 'PATCH', { patch: { phase: 'sample' } }, host)).status, 200);
+  assert.equal((await call(code, 'PATCH', { patch: { phase: 'studio' } }, host)).status, 400, 'cannot start before participants ready up');
+  assert.equal((await call(code, 'PATCH', { patch: { [`players.${own.slot}.sampleReady`]: 'yes' } }, own.token)).status, 403);
+  const other = players.find(player => player.slot !== own.slot);
+  assert.equal((await call(code, 'PATCH', { patch: { [`players.${other.slot}.sampleReady`]: true } }, own.token)).status, 403, 'cannot ready another player');
+  for (const player of players) assert.equal((await call(code, 'PATCH', { patch: { [`players.${player.slot}.sampleReady`]: true } }, player.token)).status, 200);
   assert.equal((await call(code, 'PATCH', { patch: { phase: 'studio' } }, host)).status, 200);
   for (const session of players) {
     const pack = first.room.battle.packs[session.slot];
@@ -111,6 +117,39 @@ async function main() {
   assert.equal((await call(code, 'POST', { action: 'join', name: 'New creator' })).status, 200);
   const badOrigin = new Request('http://flipthis.test/api/lobbies', { method: 'POST', headers: { origin: 'https://other.test' }, body: '{}' });
   assert.equal((await http.create(badOrigin)).status, 403);
+  // Exercise pair and trio chat through every real HTTP response path.
+  for (const size of [2, 3]) {
+    const lobby = await create(`Crew ${size}`), crewCode = lobby.session.roomId;
+    const people = [];
+    for (let i = 0; i < size; i++) people.push((await call(crewCode, 'POST', { action: 'join', name: `Creator ${i}` })).session);
+    const state = (await call(crewCode, 'GET', null, people[0].token)).room;
+    const crewId = people.map(person => person.slot).sort().join('-');
+    const outsider = (await call(crewCode, 'POST', { action: 'join', name: 'Outsider' })).session;
+    await call(crewCode, 'PATCH', { patch: { phase: 'teamup', pairs: automaticPairs(state) } }, lobby.session.token);
+    const send = (person, text) => call(crewCode, 'POST', { action: 'chat', crewId, battleId: state.battle.id, text }, person.token);
+    assert.equal((await send(people[0], 'Too soon')).status, 400);
+    for (const person of people) await call(crewCode, 'PATCH', { patch: { [`players.${person.slot}.teamUp`]: true } }, person.token);
+    await Promise.all(people.map(person => send(person, `Hello ${person.slot}`)));
+    const member = (await call(crewCode, 'GET', null, people[1].token)).room;
+    assert.equal(Object.keys(member.crewChats[crewId].chat).length, size);
+    assert.equal(member.chat, undefined, 'crew messages stay out of global chat');
+    assert.equal((await call(crewCode, 'GET', null, lobby.session.token)).room.crewChats, undefined, 'host cannot read crew messages');
+    assert.equal((await send(outsider, 'Intrusion')).status, 400);
+    assert.equal((await call(crewCode, 'GET', null, outsider.token)).room.crewChats, undefined);
+    assert.equal((await call(crewCode, 'POST', { action: 'join', name: 'Outsider' }, outsider.token)).room.crewChats, undefined, 'rejoin cannot expose crew chat');
+    assert.equal((await call(crewCode, 'PATCH', { patch: { [`players.${outsider.slot}.name`]: 'Still outside' } }, outsider.token)).room.crewChats, undefined, 'writes cannot expose crew chat');
+    const ended = await call(crewCode, 'PATCH', { patch: { phase: 'done' } }, lobby.session.token);
+    assert.equal(ended.room.crewChats, undefined);
+    assert.equal((await send(people[0], 'Keep in touch')).status, 200);
+    await call(crewCode, 'POST', { action: 'remove', slot: people[1].slot }, lobby.session.token);
+    await call(crewCode, 'PATCH', { patch: { phase: 'lobby' } }, lobby.session.token);
+    const rejoined = (await call(crewCode, 'POST', { action: 'join', name: 'New seat holder' })).session;
+    await call(crewCode, 'PATCH', { patch: { phase: 'teamup' } }, lobby.session.token);
+    await call(crewCode, 'PATCH', { patch: { [`players.${rejoined.slot}.teamUp`]: true } }, rejoined.token);
+    assert.equal((await call(crewCode, 'GET', null, rejoined.token)).room.crewChats, undefined, 'replacement seats cannot inherit old messages');
+    await call(crewCode, 'POST', { action: 'reset' }, lobby.session.token);
+    assert.equal((await call(crewCode, 'GET', null, people[0].token)).room.crewChats, undefined);
+  }
   console.log('PASS: real lobby HTTP handlers, isolated rooms, 22 concurrent joins with a 20-player cap, private host access, phase/seat authorization, reconnects, voting, feedback, chat, remixes, reset and stale-save protection.');
 }
 const keepAlive = setInterval(() => {}, 1000);

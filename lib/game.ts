@@ -172,3 +172,12 @@ export function botFlip(room: RoomState, slot: SlotId, partner: SlotId) {
   beat.place.melody['0'] = mel; beat.place.melody['1'] = mel;
   return { of: partner, beat, edits: 2, done: true };
 }
+
+/** Demo players are ready automatically; people explicitly ready up. */
+export function sampleReady(room: RoomState, slot: SlotId) {
+  return !!(room.players[slot]?.bot || room.players[slot]?.sampleReady);
+}
+export function everyoneSampleReady(room: RoomState) {
+  const slots = joinedSlots(room);
+  return slots.length >= 3 && slots.every(slot => sampleReady(room, slot));
+}

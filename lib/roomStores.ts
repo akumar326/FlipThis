@@ -1,4 +1,5 @@
 'use client';
+import { roomForChatMember } from './chat';
 import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, roomCode, randomSecret, type LobbyRecord } from './lobbies';
 import type { Session } from './session';
 import type { RoomStore, Patch } from './store';
@@ -61,7 +62,7 @@ function localLobbyStore(code: string, token: string): RoomStore {
   const listeners = new Set<(room: RoomState) => void>();
   const errors = new Set<(error: Error) => void>();
   function refresh() {
-    try { const record = read(code); actorFor(record, token); listeners.forEach(cb => cb(record.room)); }
+    try { const record = read(code); actorFor(record, token); listeners.forEach(cb => cb(roomForChatMember(record.room, actorFor(record, token).slot || 'host'))); }
     catch (err) { errors.forEach(cb => cb(err as Error)); }
   }
   channel?.addEventListener('message', refresh);
@@ -81,7 +82,7 @@ function localLobbyStore(code: string, token: string): RoomStore {
     update(patch, battleId) { return change(record => updateLobbyRecord(record, token, patch, battleId)); },
     reset() { return change(record => resetLobbyRecord(record, token)); },
     removePlayer(slot) { return change(record => removeLobbyPlayer(record, token, slot)); },
-    sendChat(_author, text, battleId) { return change(record => chatLobbyRecord(record, token, text, battleId, randomSecret())); },
+    sendChat(_author, text, battleId, crewId) { return change(record => chatLobbyRecord(record, token, text, battleId, randomSecret(), crewId)); },
   };
 }
 
@@ -125,7 +126,7 @@ function onlineLobbyStore(code: string, token: string): RoomStore {
     update(patch: Patch, expectedBattleId?: string) { return change({ patch, expectedBattleId }, 'PATCH'); },
     reset() { return change({ action: 'reset' }); },
     removePlayer(slot: SlotId) { return change({ action: 'remove', slot }); },
-    sendChat(_author, text, battleId) { return change({ action: 'chat', text, battleId }); },
+    sendChat(_author, text, battleId, crewId) { return change({ action: 'chat', text, battleId, crewId }); },
   };
 }
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BATTLE_NAME, BPM, KEY_LABEL, PHASES, PHASE_LABELS, PHASE_MINUTES, SLOTS, type Phase, type SlotId } from '@/lib/config';
 import { sampleBars, normalizeBeat } from '@/lib/beat';
-import { automaticPairs, botComments, botFlip, botPlayer, botVotes, joinedSlots, playerName, standings, tagOverlap } from '@/lib/game';
+import { everyoneSampleReady, sampleReady, automaticPairs, botComments, botFlip, botPlayer, botVotes, joinedSlots, playerName, standings, tagOverlap } from '@/lib/game';
 import { createVoting, eligibleSlots, votingBeat } from '@/lib/voting';
 import { clearSession, loadSession, invitePath, type Session } from '@/lib/session';
 import { useNow, useRoom, type Patch } from '@/lib/store';
@@ -12,11 +12,14 @@ import { Chassis, PhasePills, formatClock } from '@/components/Chassis';
 import { battleSample } from '@/lib/battle';
 import { BeatPlayer } from '@/components/Playback';
 import { LobbyInvite } from '@/components/LobbyInvite';
+import { SubmissionFeedback } from '@/components/Screens';
+import { SampleBriefing } from '@/components/SampleBriefing';
 import { RoomChat } from '@/components/RoomChat';
 
 const PHASE_HELP: Record<Phase, string> = {
   lobby: 'Up to 20 players join with the room invite. Demo room size is adjustable below.',
   taste: 'Everyone drops one song and 2 vibe tags. These tags pick the Flip Back pairs.',
+  sample: 'Listen to the shared sample. Everyone readies up before the host starts Flip.',
   studio: 'Everyone flips the shared battle sample with their own sample bank and any drum kit.',
   vote: 'Blind A/B votes. Each player judges the matchups that don’t include their own beat.',
   reveal: 'Names and scores are revealed. Check the Flip Back pairs below before moving on.',
@@ -50,6 +53,7 @@ export default function HostPage() {
   const bots = joined.filter((s) => room.players[s]?.bot);
 
   const goTo = (phase: Phase) => {
+    if (room.phase === 'sample' && phase === 'studio' && !everyoneSampleReady(room)) return;
     const mins = PHASE_MINUTES[phase];
     const patch: Patch = { phase, phaseEndsAt: mins ? Date.now() + mins * 60000 : null };
     if (phase === 'vote' && !room.voting) {
@@ -119,7 +123,7 @@ export default function HostPage() {
         </div>
         <div className="row">
           <button type="button" className="btn" disabled={idx === 0} onClick={() => goTo(PHASES[idx - 1])}>Back</button>
-          <button type="button" className="btn btn-primary" disabled={idx === PHASES.length - 1 || (room.phase === 'studio' && !room.voting && eligibleSlots(room).length < 3)} onClick={() => goTo(PHASES[idx + 1])}>
+          <button type="button" className="btn btn-primary" disabled={idx === PHASES.length - 1 || (room.phase === 'sample' && !everyoneSampleReady(room)) || (room.phase === 'studio' && !room.voting && eligibleSlots(room).length < 3)} onClick={() => goTo(PHASES[idx + 1])}>
             Next: {idx < PHASES.length - 1 ? PHASE_LABELS[PHASES[idx + 1]] : 'end'}
           </button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => store.update({ phaseEndsAt: (room.phaseEndsAt && room.phaseEndsAt > Date.now() ? room.phaseEndsAt : Date.now()) + 60000 })}>+1 min</button>
@@ -133,15 +137,18 @@ export default function HostPage() {
         </div>
       </section>
 
+      {room.phase === 'sample' && <SampleBriefing room={room} />}
+
       {room.phase === 'studio' && <p className="hint">{eligibleSlots(room).length}/{joined.length} eligible submissions. At least three are needed to vote. Starting voting locks the eligible beats and a balanced schedule of at most six matchups per person.</p>}
 
       <RoomChat key={room.battle?.id || 'legacy'} room={room} store={store} author="host" />
+      <SubmissionFeedback room={room} />
 
       <section className="panel">
         <div className="panel-head"><h2>Players</h2><span className="hint">{room.lobby ? 'Seats assigned automatically · 20-player maximum' : 'Classic demo codes: PLAYER1–PLAYER20'}</span></div>
         <div className="scroll-x">
           <table className="status-grid">
-            <thead><tr><th>Seat</th><th>Name</th><th>Taste</th><th>Beat</th><th>Votes</th><th>Flip Back</th><th>Team up</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th>Seat</th><th>Name</th><th>Taste</th><th>Sample ready</th><th>Beat</th><th>Votes</th><th>Flip Back</th><th>Team up</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {SLOTS.map((s) => {
                 const p = room.players[s.id];
@@ -153,6 +160,7 @@ export default function HostPage() {
                     <td><span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: s.color }} /><code>{s.code}</code></span></td>
                     <td>{p ? <>{p.name}{p.bot && <span className="hint"> · demo</span>}</> : <span className="no">Empty</span>}</td>
                     <td>{p?.taste ? <>{p.taste.tags.join(', ')}</> : <span className="no">–</span>}</td>
+                    <td>{p ? <span className={sampleReady(room, s.id) ? 'ok' : 'no'}>{sampleReady(room, s.id) ? 'Ready' : '–'}</span> : '–'}</td>
                     <td>{beat ? <span className={p?.submitted ? 'ok' : ''}>{p?.submitted ? 'Submitted' : 'Building'} · sample {sampleBars(beat)} bars</span> : <span className="no">–</span>}</td>
                     <td>{p ? `${nVotes}/${needVotes}` : '–'}</td>
                     <td>{p?.flip ? <span className={p.flip.done ? 'ok' : ''}>{p.flip.done ? 'Sent' : 'Editing'} · {p.flip.edits} edits</span> : <span className="no">–</span>}</td>

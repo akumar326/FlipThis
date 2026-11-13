@@ -1,3 +1,4 @@
+import { roomForChatMember } from '../chat';
 import { createHash } from 'node:crypto';
 import { actorFor, createLobbyRecord, joinLobbyRecord, updateLobbyRecord, resetLobbyRecord, chatLobbyRecord, removeLobbyPlayer, LobbyError, ROOM_CODE_PATTERN, randomSecret, roomCode, type LobbyRecord } from '../lobbies';
 import type { Session } from '../session';
@@ -50,7 +51,7 @@ export function lobbyHttp(repository: LobbyRepository) {
         const body = await bodyFrom(request), token = randomSecret(), key = hash(token);
         for (let attempt = 0; attempt < 8; attempt++) {
           const code = roomCode(), record = createLobbyRecord(code, body.name, body.hostName, key);
-          if (await repository.create(code, record)) return json({ room: record.room, session: sessionFor(record, key, token) }, 201);
+          if (await repository.create(code, record)) return json({ room: roomForChatMember(record.room, 'host'), session: sessionFor(record, key, token) }, 201);
         }
         throw new LobbyError('Could not reserve a lobby code. Please retry.', 503);
       } catch (error) { return errorResponse(error); }
@@ -64,7 +65,7 @@ export function lobbyHttp(repository: LobbyRepository) {
           if (!token) throw new LobbyError('Join this lobby to see the room.', 401);
           const record = requireRecord(await repository.read(code));
           const session = sessionFor(record, hash(token), token);
-          return json({ room: record.room, identity: { role: session.role, slot: session.slot, name: session.name } });
+          return json({ room: roomForChatMember(record.room, session.slot || 'host'), identity: { role: session.role, slot: session.slot, name: session.name } });
         }
         const body = await bodyFrom(request);
         if (request.method === 'POST' && body.action === 'join') {
@@ -73,7 +74,7 @@ export function lobbyHttp(repository: LobbyRepository) {
             const record = requireRecord(current);
             if (token) actorFor(record, key);
             const joined = joinLobbyRecord(record, body.name, key);
-            return { record: joined.record, result: { room: joined.record.room, session: sessionFor(joined.record, key, nextToken) } };
+            return { record: joined.record, result: { room: roomForChatMember(joined.record.room, actorFor(joined.record, key).slot || 'host'), session: sessionFor(joined.record, key, nextToken) } };
           });
           return json(result);
         }
@@ -84,10 +85,10 @@ export function lobbyHttp(repository: LobbyRepository) {
           let next: LobbyRecord;
           if (request.method === 'PATCH') next = updateLobbyRecord(record, key, body.patch as Record<string, unknown>, typeof body.expectedBattleId === 'string' ? body.expectedBattleId : undefined);
           else if (request.method === 'POST' && body.action === 'reset') next = resetLobbyRecord(record, key);
-          else if (request.method === 'POST' && body.action === 'chat' && typeof body.text === 'string' && typeof body.battleId === 'string') next = chatLobbyRecord(record, key, body.text, body.battleId, randomSecret());
+          else if (request.method === 'POST' && body.action === 'chat' && typeof body.text === 'string' && typeof body.battleId === 'string') next = chatLobbyRecord(record, key, body.text, body.battleId, randomSecret(), typeof body.crewId === 'string' ? body.crewId : undefined);
           else if (request.method === 'POST' && body.action === 'remove' && typeof body.slot === 'string') next = removeLobbyPlayer(record, key, body.slot as SlotId);
           else throw new LobbyError('Unknown room action.');
-          return { record: next, result: { room: next.room } };
+          return { record: next, result: { room: roomForChatMember(next.room, actorFor(next, key).slot || 'host') } };
         });
         return json(result);
       } catch (error) { return errorResponse(error); }

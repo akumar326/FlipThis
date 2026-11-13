@@ -18,7 +18,9 @@ Taste Drop accepts two custom vibe tags. Even-sized rooms are paired automatical
 
 For song previews, enter an artist/title, choose **Find song preview**, and select the correct recording. A Next.js route searches Apple's public catalog and attaches an official Apple Music player to the taste wall. Alternatively attach a YouTube video or Apple Music song URL. Players open previews explicitly; nothing autoplays. Previews require internet, have provider/region availability limits, and offer an external link if embedding fails. Apple Music offers preview clips for listeners without a subscription. Song sharing, beat building, and local room sync still work when lookup is unavailable. No API keys or deployment are needed.
 
-Phases (the host presses **Next** to move everyone): Lobby → Taste Drop → Flip → Vote → Reveal → Flip Back → Team Up → Crews.
+Phases (the host presses **Next** to move everyone): Lobby → Taste Drop → Battle Sample → Flip → Vote → Reveal → Flip Back → Team Up → Crews.
+
+On **Battle Sample**, participants hear only the shared sample and ready up. The host sees readiness live and starts Flip once all players are ready (at least three). Demo players are ready automatically. The host’s room code is enlarged for projection.
 
 The arrangement is **16 bars**, with independently editable loop placements and drum toggles in every bar. Scroll horizontally to reach all bars on smaller screens. Every source loop is **8 bars at 130 BPM in B minor** and follows the same progression (Bm · Bm · F#m7 · A · Bm · Bm · F# · A), so any loop from any bank fits with any other. Arrangement bars 1–8 use source bars 1–8; bars 9–16 use source bars 1–8 again. The drum sequencer supports 8 or 16 steps per bar, repeated in each enabled bar. Expanding preserves hits on their existing timing; reducing removes the finer in-between hits. Compact loop codes match the sound cards; the sample legend identifies each variation, and tapping a placed block shows its full name.
 
@@ -86,3 +88,5 @@ Messages persist across refreshes in the current room, and **New battle / reset*
 ## Verification
 
 `npm test` covers existing game/audio behavior plus the real HTTP lobby handlers using an isolated repository. `npm run test:browser` exercises fresh browser profiles; `npm run test:firebase` is an explicit credentialed cloud check. See [DEPLOYMENT.md](DEPLOYMENT.md) for what each verifies.
+
+After reveal, everyone can listen to each submission and read all of its voting comments, including who wrote them. Mutually formed pairs and trios get a private crew chat immediately during Team Up and on the final Crews screen. Named-lobby responses include only the current player’s crew messages; the host and other crews do not receive them. Crew and global chat histories clear with a new battle. Global chat has no suggested-message buttons or empty-state conversation box.

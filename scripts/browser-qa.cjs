@@ -91,6 +91,7 @@ async function main() {
     const host = await hostContext.newPage(), maya = await mayaContext.newPage(), rae = await raeContext.newPage();
     for (const page of [host, maya, rae]) page.on('pageerror', error => errors.push(error.message));
     const link = await create(host, 'Online class battle');
+    assert.ok(await host.locator('.host-room-code strong').evaluate(el => parseFloat(getComputedStyle(el).fontSize)) >= 36, 'projected room code is large');
     await join(maya, link, 'Maya'); await join(rae, link, 'Rae');
     const m = await identity(maya), r = await identity(rae), h = await identity(host);
     assert.notEqual(m.slot, r.slot); assert.ok(m.transport === 'online');
@@ -111,6 +112,19 @@ async function main() {
     await maya.getByLabel('Vibe 2', { exact: true }).fill('shared joy');
     await maya.getByRole('button', { name: 'Drop it on the wall' }).click();
     await maya.getByText('Your taste is on the wall.', { exact: false }).waitFor();
+    await phase(host, 'Battle Sample');
+    await maya.getByRole('button', { name: 'I’m ready for the battle', exact: true }).waitFor();
+    assert.equal(await host.getByRole('button', { name: 'Next: Flip', exact: true }).isDisabled(), true);
+    const audio = maya.getByLabel('Listen to the battle sample');
+    assert.ok((await audio.getAttribute('src')).endsWith('/shared_vox_chop.wav'));
+    await host.screenshot({ path: '/private/tmp/flipthis-sample-host.png', fullPage: true });
+    await maya.screenshot({ path: '/private/tmp/flipthis-sample-player.png', fullPage: true });
+    await maya.getByRole('button', { name: 'I’m ready for the battle', exact: true }).click();
+    await maya.reload();
+    await maya.getByRole('button', { name: 'Ready! Click to unready', exact: true }).waitFor();
+    await rae.getByRole('button', { name: 'I’m ready for the battle', exact: true }).click();
+    const readyResponse = await http.room(new Request(`${base}/api/lobbies/${m.roomId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${third.token}` }, body: JSON.stringify({ patch: { [`players.${third.slot}.sampleReady`]: true } }) }), m.roomId);
+    assert.equal(readyResponse.status, 200);
     await phase(host, 'Flip');
     await maya.getByRole('heading', { name: 'Arrangement · 16 bars' }).waitFor();
     await maya.locator('.loop-card').first().click();
@@ -168,7 +182,7 @@ async function main() {
     await maya.locator('.vote-confirm').waitFor();
     await maya.getByRole('heading', { name: 'All 1 votes in' }).waitFor();
     await phase(host, 'Reveal');
-    await rae.getByRole('heading', { name: 'What people heard in your beat' }).waitFor();
+    await rae.getByRole('heading', { name: 'Comments on every submission' }).waitFor();
     await waitFor(() => rae.getByText(/This makes me feel hopeful.|I liked the contrast at the end./).count().then(count => count > 0), 'revealed feedback');
     await maya.getByRole('heading', { name: 'Talk about the flips' }).waitFor();
     await maya.getByText('Welcome to the online lobby', { exact: true }).waitFor();
@@ -178,6 +192,21 @@ async function main() {
     await maya.getByText('6 edits · unlimited', { exact: true }).waitFor();
     await maya.getByRole('button', { name: 'Done', exact: true }).click();
     await waitFor(() => records.get(m.roomId).room.players[m.slot].flip?.done, 'remix save');
+    await phase(host, 'Team Up');
+    await maya.getByRole('button', { name: 'Yes, form a crew', exact: true }).click();
+    assert.equal(await maya.getByRole('heading', { name: 'Your crew chat', exact: true }).count(), 0);
+    await rae.getByRole('button', { name: 'Yes, form a crew', exact: true }).click();
+    const teamResponse = await http.room(new Request(`${base}/api/lobbies/${m.roomId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${third.token}` }, body: JSON.stringify({ patch: { [`players.${third.slot}.teamUp`]: true } }) }), m.roomId);
+    assert.equal(teamResponse.status, 200);
+    await maya.getByRole('heading', { name: 'Your crew chat', exact: true }).waitFor();
+    await maya.getByLabel('Message your crew', { exact: true }).fill('Let’s make another beat together');
+    await maya.getByRole('button', { name: 'Send to crew', exact: true }).click();
+    await rae.getByText('Let’s make another beat together', { exact: true }).waitFor();
+    assert.equal(await host.getByText('Let’s make another beat together', { exact: true }).count(), 0);
+    await phase(host, 'Crews');
+    await rae.reload();
+    await rae.getByText('Let’s make another beat together', { exact: true }).waitFor();
+    assert.equal(await maya.getByRole('button', { name: 'What have you been listening to lately?' }).count(), 0);
     await host.getByRole('button', { name: 'New battle / reset', exact: true }).click();
     await host.getByRole('dialog').getByRole('button', { name: 'New battle / reset', exact: true }).click();
     await maya.getByRole('heading', { name: 'You’re in, Maya.' }).waitFor();
@@ -186,7 +215,7 @@ async function main() {
     assert.equal(await host.getByLabel('Lobby invite link').inputValue(), link);
     await host.screenshot({ path: '/private/tmp/flipthis-online-lobby.png', fullPage: true });
     assert.deepEqual(errors, [], 'no uncaught browser exceptions');
-    console.log('PASS: three independent online browser identities, host-only controls, chat, taste, beat autosave and reload, 16-step layout, pause/resume and stop-to-start playback, balanced voting animation, feedback reveal, unlimited remix, and reset/reconnect.');
+    console.log('PASS: three independent online browser identities, host-only controls, chat, taste, shared-sample readiness and reconnect, beat autosave and reload, 16-step layout, pause/resume and stop-to-start playback, balanced voting animation, public feedback on all submissions, unlimited remix, private trio chat and reconnect, and reset/reconnect.');
     await hostContext.close(); await mayaContext.close(); await raeContext.close();
   } finally { await browser.close(); }
 }

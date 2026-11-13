@@ -1,7 +1,7 @@
 import { PHASES, SLOTS, KITS, LANES, DRUM_ROWS, LOOP_BY_ID, type SlotId } from './config';
 import { newBattleRoom, battleSample } from './battle';
 import { normalizeBeat, canSubmit, loopIdsIn } from './beat';
-import { normalizeTags, pairKey, botVotes, botComments } from './game';
+import { everyoneSampleReady, normalizeTags, pairKey, botVotes, botComments } from './game';
 import { createVoting } from './voting';
 import { playerBank } from './packs';
 import { songEmbed } from './songs';
@@ -95,6 +95,7 @@ function validatePlayerPatch(room: RoomState, slot: SlotId, path: string, value:
     if (value.preview && (!isObject(value.preview) || Object.keys(value.preview).some(key => !['provider', 'title', 'url'].includes(key)) || typeof value.preview.title !== 'string' || value.preview.title.length > 200 || typeof value.preview.url !== 'string' || value.preview.url.length > 2000 || !songEmbed(value.preview as never))) throw new LobbyError('Invalid song preview.');
     return;
   }
+  if (field === 'sampleReady' && room.phase === 'sample' && typeof value === 'boolean') return;
   if (field === 'beat' && room.phase === 'studio') { checkBeat(value, room, slot); return; }
   if (field === 'submitted' && room.phase === 'studio' && typeof value === 'boolean') return;
   if (room.phase === 'vote' && field.startsWith('votes.')) {
@@ -127,6 +128,7 @@ export function updateLobbyRecord(record: LobbyRecord, key: string, patch: Recor
     setPath(next.room as unknown as Record<string, unknown>, path, value);
   }
   if (!PHASES.includes(next.room.phase) || (next.room.phaseEndsAt != null && (!Number.isFinite(next.room.phaseEndsAt) || next.room.phaseEndsAt < 0)) || Object.keys(next.room.players).some(id => !SLOTS.some(s => s.id === id))) throw new LobbyError('Invalid room state.');
+  if (actor.role === 'host' && record.room.phase === 'sample' && next.room.phase === 'studio' && !everyoneSampleReady(next.room)) throw new LobbyError('Wait for at least three players and for everyone to ready up.');
   if (actor.role === 'host' && next.room.phase === 'vote' && !record.room.voting) {
     next.room.voting = createVoting(next.room);
     if (next.room.voting.slots.length < 3) throw new LobbyError('At least three eligible submissions are needed to vote.');
@@ -151,11 +153,11 @@ export function resetLobbyRecord(record: LobbyRecord, key: string): LobbyRecord 
   next.room.updatedAt = Math.max(Date.now(), record.room.updatedAt + 1);
   return next;
 }
-export function chatLobbyRecord(record: LobbyRecord, key: string, text: string, battleId: string, id: string): LobbyRecord {
+export function chatLobbyRecord(record: LobbyRecord, key: string, text: string, battleId: string, id: string, crewId?: string): LobbyRecord {
   const actor = actorFor(record, key);
   const author: ChatAuthor = actor.role === 'host' ? 'host' : actor.slot!;
   try {
-    return { ...record, room: { ...record.room, ...appendChat(record.room, author, text, battleId, id), updatedAt: Math.max(Date.now(), record.room.updatedAt + 1) } };
+    return { ...record, room: { ...record.room, ...appendChat(record.room, author, text, battleId, id, Date.now(), crewId), updatedAt: Math.max(Date.now(), record.room.updatedAt + 1) } };
   } catch (err) { throw new LobbyError(err instanceof Error ? err.message : 'Chat is unavailable.'); }
 }
 export function removeLobbyPlayer(record: LobbyRecord, key: string, slot: SlotId): LobbyRecord {
@@ -163,6 +165,7 @@ export function removeLobbyPlayer(record: LobbyRecord, key: string, slot: SlotId
   if (!SLOTS.some(s => s.id === slot)) throw new LobbyError('Unknown seat.');
   const next = structuredClone(record);
   delete next.seats[slot]; delete next.room.players[slot];
+  for (const crewId of Object.keys(next.room.crewChats || {})) if (crewId.split('-').includes(slot)) delete next.room.crewChats![crewId];
   next.room.updatedAt = Math.max(Date.now(), record.room.updatedAt + 1);
   return next;
 }

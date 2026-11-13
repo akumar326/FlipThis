@@ -25,6 +25,7 @@ export interface PlayerState {
   joinedAt: number;
   bank?: BankId;
   taste?: Taste;
+  sampleReady?: boolean;
   beat?: Beat;
   submitted?: boolean;
   /** pair key ("p1-p2") -> winning slot */
@@ -48,6 +49,7 @@ export interface RoomState {
   lobby?: { code: string; name: string; hostName: string; createdAt: number };
   chat?: Record<string, ChatMessage>;
   chatSequence?: number;
+  crewChats?: Record<string, { chat: Record<string, ChatMessage>; chatSequence: number }>;
   battle?: BattleSetup;
   voting?: VotingState;
   phase: Phase;

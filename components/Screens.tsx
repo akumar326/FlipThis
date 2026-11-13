@@ -239,15 +239,21 @@ export function Reveal({ room, slot }: P) {
   );
 }
 
-export function SubmissionFeedback({ room, slot }: P) {
+export function SubmissionFeedback({ room, slot }: { room: RoomState; slot?: SlotId }) {
   if (PHASES.indexOf(room.phase) < PHASES.indexOf('reveal')) return null;
-  const feedback = feedbackFor(room, slot);
+  const creators = (room.voting || { slots: standings(room).map(row => row.slot) }).slots;
   return <section className="panel">
-    <div className="panel-head"><h2>What people heard in your beat</h2><span className="hint">Feedback from your blind matchups · {feedback.length} {feedback.length === 1 ? 'note' : 'notes'}</span></div>
-    <p className="hint">Keep an idea that resonates with you and bring it into your next flip. These notes stay available through the end of the battle.</p>
-    {feedback.length ? <div className="card-list">{feedback.map(note => <article key={note.author} className="card stack">
-      <SeatChip room={room} slot={note.author} /><p className="feedback-text">{note.text}</p>
-    </article>)}</div> : <p className="hint">No comments were left on your beat this round. Comments are optional.</p>}
+    <div className="panel-head"><h2>Comments on every submission</h2><span className="hint">Feedback from blind voting · visible to everyone after reveal</span></div>
+    <div className="stack">{creators.map(creator => {
+      const feedback = feedbackFor(room, creator);
+      return <article key={creator} className="card stack">
+        <h3>{playerName(room, creator)}’s submission{creator === slot ? ' · yours' : ''}</h3>
+        <BeatPlayer id={`feedback-${creator}`} beat={votingBeat(room, creator)} label={`${playerName(room, creator)}’s submission`} />
+        {feedback.length ? feedback.map(note => <div key={note.author} className="card stack">
+          <SeatChip room={room} slot={note.author} /><p className="feedback-text">{note.text}</p>
+        </div>) : <p className="hint">No comments were left on this submission.</p>}
+      </article>;
+    })}</div>
   </section>;
 }
 

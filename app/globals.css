@@ -43,8 +43,6 @@ textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .chat-message { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); max-width: 90%; align-self: flex-start; }
 .chat-message[data-mine="true"] { align-self: flex-end; background: #FDEFE8; border-color: var(--peach); }
 .chat-message-head { gap: 7px; margin-bottom: 6px; font-size: 13px; }
-.chat-empty { margin: auto; text-align: center; }
-.chat-prompt { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 12px; text-align: left; }
 a { color: var(--focus); }
 h1, h2, h3 { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -193,3 +191,10 @@ h1, h2, h3 { margin: 0; }
 .vote-confirm { animation: vote-shake 360ms ease-in-out; }
 @keyframes vote-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
 @media (prefers-reduced-motion: reduce) { .vote-confirm { animation: none; } }
+
+.host-room-code { width: 100%; text-align: center; padding: 18px 8px; border-radius: 16px; background: var(--line); }
+.host-room-code > span { display: block; font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.host-room-code > strong { display: block; font-family: var(--mono); font-size: clamp(36px, 8vw, 96px); letter-spacing: .12em; line-height: 1.2; }
+.sample-briefing audio { display: block; width: min(100%, 540px); margin: 24px auto; }
+
+.chat-log[hidden] { display: none; }

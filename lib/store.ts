@@ -23,7 +23,7 @@ export interface RoomStore {
   removePlayer?(slot: import('./config').SlotId): Promise<void>;
   update(patch: Patch, expectedBattleId?: string): Promise<void>;
   reset(): Promise<void>;
-  sendChat(author: ChatAuthor, text: string, battleId: string): Promise<void>;
+  sendChat(author: ChatAuthor, text: string, battleId: string, crewId?: string): Promise<void>;
 }
 
 function setPath(obj: Record<string, unknown>, path: string, value: unknown) {
@@ -96,11 +96,11 @@ function createLocalStore(): RoomStore {
       });
     },
     async reset() { await mutate(() => write(newBattleRoom(read()))); },
-    async sendChat(author, text, battleId) {
+    async sendChat(author, text, battleId, crewId) {
       const id = chatMessageId();
       await mutate(() => {
         const room = read();
-        write({ ...room, ...appendChat(room, author, text, battleId, id), updatedAt: Date.now() });
+        write({ ...room, ...appendChat(room, author, text, battleId, id, Date.now(), crewId), updatedAt: Date.now() });
       });
     },
   };

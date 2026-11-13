@@ -16,6 +16,7 @@ import { Lobby, TasteDrop, Vote, Reveal, FlipBack, TeamUp, Done, SubmissionFeedb
 import { MIN_SAMPLE_BARS } from '@/lib/config';
 import { battleSample } from '@/lib/battle';
 import { CheckIcon } from '@/components/Icons';
+import { SampleBriefing } from '@/components/SampleBriefing';
 import { RoomChat } from '@/components/RoomChat';
 
 export default function PlayPage() {
@@ -82,8 +83,9 @@ export default function PlayPage() {
     >
       {error && <p className="error" role="alert">{error} Your work stays on this device while the connection recovers.</p>}
       <PhaseView room={room} store={store} slot={slot} />
-      <SubmissionFeedback room={room} slot={slot} />
+      <RoomChat key={`crew-${room.battle?.id || 'legacy'}`} room={room} store={store} author={slot} crew />
       <RoomChat key={room.battle?.id || 'legacy'} room={room} store={store} author={slot} />
+      <SubmissionFeedback room={room} slot={slot} />
     </Chassis>
   );
 }
@@ -92,6 +94,7 @@ function PhaseView({ room, store, slot }: { room: RoomState; store: RoomStore; s
   switch (room.phase) {
     case 'lobby': return <Lobby room={room} slot={slot} />;
     case 'taste': return <TasteDrop room={room} store={store} slot={slot} />;
+    case 'sample': return <SampleBriefing room={room} store={store} slot={slot} />;
     case 'studio': return <MyStudio room={room} store={store} slot={slot} />;
     case 'vote': return <Vote room={room} store={store} slot={slot} />;
     case 'reveal': return <Reveal room={room} slot={slot} />;
