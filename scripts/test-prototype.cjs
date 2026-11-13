@@ -20,10 +20,8 @@ async function main() {
   assert.equal(Object.keys(BANKS).length, 20, 'twenty distinct complementary packs');
   assert.equal(BATTLE_SAMPLES.length, 8);
   let previousBattle;
-  const rotation = [];
   for (let run = 0; run < 32; run++) {
     const next = newBattleRoom(previousBattle);
-    rotation.push(next.battle.sampleId);
     const assigned = SLOTS.map(({ id }) => playerBank(undefined, id, next));
     assert.equal(new Set(assigned.map(pack => pack.id)).size, 20, 'no repeated pack within a battle');
     assert.equal(new Set(assigned.flatMap(pack => pack.loops.map(loop => loop.id))).size, 80, 'personal packs share no loop files');
@@ -33,11 +31,12 @@ async function main() {
       assert.ok(Object.values(bot.beat.place.sample).every(loop => battleSample(next).loops.some(sample => sample.id === loop)));
       if (previousBattle) assert.notEqual(next.battle.packs[id], previousBattle.battle.packs[id], 'returning players get a different pack');
     }
-    if (previousBattle) assert.notEqual(next.battle.sampleId, previousBattle.battle.sampleId);
+    assert.equal(next.battle.sampleId, 'vocal');
+    assert.deepEqual(next.battle.sampleQueue, []);
     assert.equal(battleSample(JSON.parse(JSON.stringify(next))).id, battleSample(next).id, 'sample survives reload');
     previousBattle = next;
   }
-  for (let start = 0; start < rotation.length; start += 8) assert.equal(new Set(rotation.slice(start, start + 8)).size, 8, 'each rotation uses every main sample once');
+  assert.equal(new Set(SLOTS.map(slot => slot.color)).size, 20, 'every participant has a unique color');
   assert.equal(battleSample({ players: {}, phase: 'studio' }).id, 'vocal', 'existing rooms keep their original sample');
   function botPlayerForBattle(slot, room) { return load('lib/game.ts').botPlayer(slot, room); }
   const catalog = require('../lib/soundCatalog.json');
@@ -81,6 +80,27 @@ async function main() {
     assert.deepEqual(lastPosition, [15, count - 1], 'bar duration stays constant across resolutions');
     unsubscribe();
   }
+  // A mid-bar pause keeps the transport position and resumes sustained audio
+  // from the saved offset; Stop clears it for the next Play.
+  const transport = { seconds: BAR_SECONDS * 1.375, pause() {}, start() {}, stop() {}, cancel() {} };
+  engine.T = { now: () => 10, start: async () => {}, getTransport: () => transport };
+  engine.drumPlayers.clear();
+  const starts = [];
+  engine.lanePlayers.set('shared_vox_chop', { loaded: true, stop() {}, start(...args) { starts.push(args); } });
+  const sustained = emptyBeat();
+  sustained.place.sample = { 1: 'shared_vox_chop', 2: 'shared_vox_chop' };
+  engine.setBeat(sustained); engine.playing = true;
+  engine.pause();
+  assert.equal(engine.paused, true);
+  assert.equal(transport.seconds, BAR_SECONDS * 1.375);
+  await engine.resume();
+  assert.equal(engine.playing, true);
+  assert.equal(engine.counter, 22);
+  assert.equal(starts.length, 1);
+  assert.ok(Math.abs(starts[0][1] - BAR_SECONDS * 1.375) < 1e-8, 'sustained loop resumes at the saved source offset');
+  engine.stop();
+  assert.equal(transport.seconds, 0);
+  assert.equal(engine.paused, false);
   const { automaticPairs, collaborationGroups, normalizeTags, tagOverlap, botPlayer, botFlip, matchupsFor, standings, pairKey } = load('lib/game.ts');
   const { createVoting, votingBeat, votePatch, feedbackFor } = load('lib/voting.ts');
   assert.equal(SLOTS.length, 20);
@@ -307,7 +327,7 @@ async function main() {
   const previousSetup = stateA.battle;
   await a.reset();
   assert.equal(stateB.voting, undefined, 'reset removes the locked voting round');
-  assert.notEqual(stateB.battle.sampleId, previousSetup.sampleId);
+  assert.equal(stateB.battle.sampleId, 'vocal');
   assert.deepEqual(stateA.battle, stateB.battle, 'new battle sample and packs sync across tabs');
   assert.equal(new Set(Object.values(stateB.battle.packs)).size, 20);
   await b.update({ 'players.p1.beat': emptyBeat() }, previousSetup.id);
@@ -352,7 +372,7 @@ async function main() {
   assert.equal(chatMessages(stateB).length, 0, 'a new battle clears its conversation');
   await assert.rejects(b.sendChat('host', 'Late old message', chatBattle), /new battle/);
   assert.equal(chatMessages(stateA).length, 0);
-  console.log('PASS: rotating samples, twenty unique packs, generated audio integrity, saved-room compatibility, 3–20-player voting fairness and pairing, feedback routing, concurrent room chat, custom tags, eight kits and WAVs, preview URLs, API success/outage, and local tab sync.');
+  console.log('PASS: original vocal chop, twenty unique player colors, twenty unique packs, generated audio integrity, saved-room compatibility, 3–20-player voting fairness and pairing, feedback routing, concurrent room chat, custom tags, eight kits and WAVs, preview URLs, API success/outage, and local tab sync.');
 }
 // Node's Web Locks may leave only pending promises; keep the process alive until
 // every asynchronous assertion finishes instead of reporting a false success.

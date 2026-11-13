@@ -72,7 +72,7 @@ export interface ChatMessage {
 export interface BattleSetup {
   id: string;
   sampleId: string;
-  /** Remaining samples in the current shuffled rotation. */
+  /** Legacy sample rotation; empty for new battles using the original vocal chop. */
   sampleQueue: string[];
   packs: Record<SlotId, BankId>;
 }

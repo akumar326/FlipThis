@@ -1,6 +1,6 @@
 # FlipThis
 
-A 3–20-player beat battle prototype for COGS 123. Everyone flips the same rotating battle sample with a unique compatible sound pack, votes blind, then remixes another player's beat (Flip Back) and decides whether to form a crew.
+A 3–20-player beat battle prototype for COGS 123. Everyone flips the same original vocal chop with a unique compatible sound pack, votes blind, then remixes another player's beat (Flip Back) and decides whether to form a crew.
 
 **Stack:** Next.js 15 (App Router, TypeScript) · Tone.js for audio · server-authorized Firestore lobbies online · browser storage for local practice. Deployment preparation: [DEPLOYMENT.md](DEPLOYMENT.md).
 
@@ -26,7 +26,7 @@ For rehearsals, choose a **Demo room size** between 3 and 20 (default 4), then f
 
 ## Fresh sounds for each battle
 
-Use **New battle / reset** in the host panel to clear the finished round, rotate the shared sample, and reshuffle the unique packs. Eight sample families rotate in a shuffled order: Vocal Chop, Glass Garden, Midnight Keys, Neon Pulse, Paper Lanterns, Velvet Haze, Arcade Rain, and Orbit Chimes. All eight are used before the rotation repeats, with no immediate repeat across rotation boundaries. Reloading or restarting the dev server resumes the saved battle rather than discarding it.
+Use **New battle / reset** in the host panel to clear the finished round and reshuffle each participant’s unique complementary pack. Every new battle uses the original Vocal Chop, with its reverse and lo-fi variants. Reloading resumes the saved battle. Older saved battles retain their sample until reset.
 
 The new library contains 85 original synthesized eight-bar WAV files: 64 personal loops and 21 shared sample variants. Regenerate these and their waveform previews with `npm run generate-loops`. Generation is offline and deterministic; all generated loops use 22.05 kHz mono PCM, the project tempo, and the existing chord progression. Reverse variants reverse within each bar to keep harmonic changes aligned. The original source loops are retained. Only the current battle’s sample variants and a player’s own pack are loaded for editing; imported partner sounds also load during remixing.
 

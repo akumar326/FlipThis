@@ -134,7 +134,12 @@ export interface SlotDef { id: SlotId; code: string; color: string; defaultName:
 /** Neutral seats; sound packs are assigned independently when a player joins. */
 export const SLOTS: SlotDef[] = Array.from({ length: MAX_PLAYERS }, (_, i) => ({
   id: `p${i + 1}` as SlotId, code: `PLAYER${i + 1}`,
-  color: ['#F49A7A', '#8EA6F2', '#7CCB9E', '#B6A4E6'][i % 4], defaultName: `Player ${i + 1}`,
+  color: [
+    '#F49A7A', '#8EA6F2', '#7CCB9E', '#B6A4E6', '#E6C36A',
+    '#DE8FAA', '#68B9C5', '#B7C878', '#D69CDB', '#D8AE86',
+    '#A3BCE8', '#70AB91', '#CE8790', '#AAA1CD', '#C5B35E',
+    '#DFAEBA', '#82C9BA', '#C3A0A0', '#92AA6D', '#BC9CEB',
+  ][i], defaultName: `Player ${i + 1}`,
 }));
 export const SLOT_BY_ID: Record<SlotId, SlotDef> = Object.fromEntries(SLOTS.map((s) => [s.id, s])) as Record<SlotId, SlotDef>;
 /** The facilitator code opens the host panel. */

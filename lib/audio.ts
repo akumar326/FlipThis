@@ -25,7 +25,9 @@ class AudioEngine {
   private runs: Record<string, { id: string; end: number } | null> = {};
   private listeners = new Set<(bar: number, step: number) => void>();
   private buses: Partial<Record<LaneId | 'drums', import('tone').Volume>> = {};
+  private generation = 0;
   playing = false;
+  paused = false;
 
   private init(): Promise<ToneNS> {
     if (!this.initP) {
@@ -103,10 +105,12 @@ class AudioEngine {
   }
 
   async play(beat: Beat) {
+    this.stop();
+    const generation = this.generation;
     const T = await this.init();
     await T.start();
     await Promise.all([this.loadKits(), this.loadLoops(Object.values(beat.place).flatMap((m) => Object.values(m || {})))]);
-    this.stop();
+    if (generation !== this.generation) return;
     this.beat = beat;
     this.counter = 0;
     this.runs = {};
@@ -119,16 +123,75 @@ class AudioEngine {
     this.playing = true;
   }
 
+  pause() {
+    if (!this.T || !this.playing) return;
+    const transport = this.T.getTransport();
+    transport.pause();
+    this.generation++;
+    this.silence();
+    this.playing = false;
+    this.paused = true;
+  }
+
+  async resume() {
+    if (!this.T || !this.paused || !this.beat) return;
+    const generation = this.generation;
+    await this.T.start();
+    if (generation !== this.generation || !this.paused) return;
+    const transport = this.T.getTransport();
+    const seconds = transport.seconds;
+    this.counter = Math.ceil((seconds / BAR_SECONDS) * 16 - 1e-6);
+    const position = (seconds / BAR_SECONDS) % BARS;
+    const bar = Math.floor(position);
+    const fraction = position - bar;
+    const time = this.T.now() + 0.06;
+    // Restart sustained loops at their saved source offset, between grid ticks.
+    if (fraction > 1e-6) this.startLanes(time, bar, fraction);
+    transport.start(time);
+    this.paused = false;
+    this.playing = true;
+  }
+
+  private silence() {
+    if (!this.T) return;
+    const now = this.T.now();
+    this.lanePlayers.forEach(p => p.stop(now));
+    this.drumPlayers.forEach(p => p.stop(now));
+    this.preview?.stop(now);
+    this.runs = {};
+  }
+
   stop() {
+    this.generation++;
+    this.playing = false;
+    this.paused = false;
     if (!this.T) return;
     const transport = this.T.getTransport();
     transport.stop();
     transport.cancel();
-    const now = this.T.now();
-    this.lanePlayers.forEach((p) => { if (p.state === 'started') p.stop(now); });
-    this.runs = {};
-    this.playing = false;
+    transport.seconds = 0;
+    this.counter = 0;
+    this.silence();
     this.listeners.forEach((l) => l(-1, -1));
+  }
+
+  private startLanes(time: number, bar: number, fraction = 0) {
+    for (const lane of LANES) {
+      const want = this.beat!.place[lane.id]?.[String(bar)];
+      const run = this.runs[lane.id];
+      const continuing = run && run.id === want && bar < run.end && bar !== 0;
+      if (continuing) continue;
+      if (run) { const p = this.lanePlayers.get(run.id); if (p?.state === 'started') p.stop(time); this.runs[lane.id] = null; }
+      if (!want) continue;
+      const p = this.lanePlayers.get(want);
+      if (!p?.loaded) continue;
+      const sourceBar = bar % LOOP_BARS;
+      const sourceEnd = Math.min(BARS, bar + LOOP_BARS - sourceBar);
+      let end = bar + 1;
+      while (end < sourceEnd && this.beat!.place[lane.id]?.[String(end)] === want) end++;
+      p.start(time, (sourceBar + fraction) * BAR_SECONDS, (end - bar - fraction) * BAR_SECONDS);
+      this.runs[lane.id] = { id: want, end };
+    }
   }
 
   private tick(time: number) {
@@ -141,24 +204,7 @@ class AudioEngine {
     const stride = 16 / count;
     const step = Math.floor(subdivision / stride);
 
-    if (subdivision === 0) {
-      for (const lane of LANES) {
-        const want = beat.place[lane.id]?.[String(bar)];
-        const run = this.runs[lane.id];
-        const continuing = run && run.id === want && bar < run.end && bar !== 0;
-        if (continuing) continue;
-        if (run) { const p = this.lanePlayers.get(run.id); if (p?.state === 'started') p.stop(time); this.runs[lane.id] = null; }
-        if (!want) continue;
-        const p = this.lanePlayers.get(want);
-        if (!p?.loaded) continue;
-        const sourceBar = bar % LOOP_BARS;
-        const sourceEnd = Math.min(BARS, bar + LOOP_BARS - sourceBar);
-        let end = bar + 1;
-        while (end < sourceEnd && beat.place[lane.id]?.[String(end)] === want) end++;
-        p.start(time, sourceBar * BAR_SECONDS, (end - bar) * BAR_SECONDS);
-        this.runs[lane.id] = { id: want, end };
-      }
-    }
+    if (subdivision === 0) this.startLanes(time, bar);
 
     if (beat.drumOn[bar] && subdivision % stride === 0) {
       for (const row of DRUM_ROWS) {
@@ -169,7 +215,10 @@ class AudioEngine {
       }
     }
 
-    T.getDraw().schedule(() => this.listeners.forEach((l) => l(bar, step)), time);
+    const generation = this.generation;
+    T.getDraw().schedule(() => {
+      if (generation === this.generation && !this.paused) this.listeners.forEach((l) => l(bar, step));
+    }, time);
   }
 }
 

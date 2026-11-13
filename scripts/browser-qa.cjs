@@ -123,6 +123,22 @@ async function main() {
     });
     assert.deepEqual(layout, { count: 16, rows: 1, fits: true });
     await waitFor(() => records.get(m.roomId).room.players[m.slot].beat?.steps.kick.length === 16, 'autosave');
+    await maya.getByRole('button', { name: 'Play beat', exact: true }).click();
+    await maya.waitForTimeout(2300);
+    await maya.getByRole('button', { name: 'Pause beat', exact: true }).click();
+    const pausedBar = await maya.locator('[role="status"]').filter({ hasText: 'Paused · Bar' }).innerText();
+    assert.ok(!pausedBar.includes('Bar 1/'), 'playback advanced beyond the first bar');
+    await maya.waitForTimeout(500);
+    assert.equal(await maya.locator('[role="status"]').filter({ hasText: 'Paused · Bar' }).innerText(), pausedBar);
+    await maya.getByRole('button', { name: 'Resume beat', exact: true }).click();
+    await maya.waitForTimeout(300);
+    await maya.getByRole('button', { name: 'Stop beat and return to start', exact: true }).click();
+    await maya.getByText('Ready · Bar 1/16', { exact: true }).waitFor();
+    await maya.getByRole('button', { name: 'Play beat', exact: true }).click();
+    await maya.waitForTimeout(300);
+    await maya.getByText('Playing · Bar 1/16', { exact: true }).waitFor();
+    await maya.getByRole('button', { name: 'Stop beat and return to start', exact: true }).click();
+
     await maya.reload();
     await maya.getByRole('heading', { name: 'Drum sequencer · 16 steps' }).waitFor();
     assert.equal((await identity(maya)).slot, m.slot);
@@ -170,7 +186,7 @@ async function main() {
     assert.equal(await host.getByLabel('Lobby invite link').inputValue(), link);
     await host.screenshot({ path: '/private/tmp/flipthis-online-lobby.png', fullPage: true });
     assert.deepEqual(errors, [], 'no uncaught browser exceptions');
-    console.log('PASS: three independent online browser identities, host-only controls, chat, taste, beat autosave and reload, 16-step layout, balanced voting animation, feedback reveal, unlimited remix, and reset/reconnect.');
+    console.log('PASS: three independent online browser identities, host-only controls, chat, taste, beat autosave and reload, 16-step layout, pause/resume and stop-to-start playback, balanced voting animation, feedback reveal, unlimited remix, and reset/reconnect.');
     await hostContext.close(); await mayaContext.close(); await raeContext.close();
   } finally { await browser.close(); }
 }

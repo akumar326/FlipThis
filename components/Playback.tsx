@@ -8,13 +8,36 @@ import { PlayIcon, StopIcon } from './Icons';
 
 /** Which beat (by key) the shared engine is playing, so only one plays at a time. */
 let current: string | null = null;
+let paused = false;
 const subs = new Set<(k: string | null) => void>();
-function setCurrent(k: string | null) { current = k; subs.forEach((s) => s(k)); }
+function setCurrent(k: string | null, isPaused = false) { current = k; paused = isPaused; subs.forEach((s) => s(k)); }
+
+export function usePlayback() {
+  const [state, setState] = useState({ key: current, paused });
+  useEffect(() => {
+    const update = () => setState({ key: current, paused });
+    subs.add(update); update();
+    return () => { subs.delete(update); };
+  }, []);
+  return state;
+}
 
 export function usePlaying() {
-  const [k, setK] = useState<string | null>(current);
-  useEffect(() => { subs.add(setK); return () => { subs.delete(setK); }; }, []);
-  return k;
+  const state = usePlayback();
+  return state.paused ? null : state.key;
+}
+
+export async function toggleStudioPlayback(key: string, beat: Beat) {
+  const engine = getEngine();
+  if (current !== key) return playBeat(key, beat);
+  if (paused) {
+    engine.setBeat(beat);
+    setCurrent(key);
+    await engine.resume();
+  } else if (engine.playing) {
+    engine.pause();
+    setCurrent(key, true);
+  } else stopAll();
 }
 
 export async function playBeat(key: string, beat: Beat) {

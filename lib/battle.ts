@@ -13,12 +13,6 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 export function newBattleRoom(previous?: RoomState): RoomState {
-  const last = previous?.battle?.sampleId || 'vocal';
-  let queue = previous?.battle?.sampleQueue?.filter(id => BATTLE_SAMPLES.some(s => s.id === id) && id !== last) || [];
-  if (!queue.length) {
-    queue = shuffle(BATTLE_SAMPLES.map(s => s.id));
-    if (queue[0] === last) [queue[0], queue[1]] = [queue[1], queue[0]];
-  }
   const banks = shuffle(Object.keys(BANKS) as BankId[]);
   // A returning seat also gets a different pack from the preceding battle.
   const repeats = SLOTS.map((s, i) => previous?.battle?.packs[s.id] === banks[i] ? i : -1).filter(i => i >= 0);
@@ -32,7 +26,7 @@ export function newBattleRoom(previous?: RoomState): RoomState {
   const randomId = new Uint32Array(4);
   crypto.getRandomValues(randomId);
   const battle: BattleSetup = {
-    id: Array.from(randomId, n => n.toString(16).padStart(8, '0')).join(''), sampleId: queue[0], sampleQueue: queue.slice(1),
+    id: Array.from(randomId, n => n.toString(16).padStart(8, '0')).join(''), sampleId: 'vocal', sampleQueue: [],
     packs: Object.fromEntries(SLOTS.map((s, i) => [s.id, banks[i]])) as Record<SlotId, BankId>,
   };
   return { ...EMPTY_ROOM, players: {}, battle, updatedAt: Date.now() };

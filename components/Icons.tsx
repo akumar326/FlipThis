@@ -10,3 +10,7 @@ export const XIcon = () => (
 export const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.8" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
+
+export const PauseIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1" /><rect x="12" y="4" width="3" height="12" rx="1" /></svg>
+);

@@ -7,8 +7,8 @@ import type { Beat } from '@/lib/types';
 import { loopLabel } from '@/lib/loopLabels';
 import peaks from '@/lib/peaks.json';
 import generatedPeaks from '@/lib/generatedPeaks.json';
-import { playBeat, stopAll, usePlaying, usePosition } from './Playback';
-import { PlayIcon, StopIcon, XIcon } from './Icons';
+import { toggleStudioPlayback, stopAll, usePlayback, usePosition } from './Playback';
+import { PlayIcon, PauseIcon, StopIcon, XIcon } from './Icons';
 
 const LANE = Object.fromEntries(LANES.map((l) => [l.id, l])) as Record<LaneId, (typeof LANES)[number]>;
 const PEAKS = { ...peaks, ...generatedPeaks } as Record<string, number[]>;
@@ -30,7 +30,10 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
   const engine = getEngine();
   const count = drumStepCount(beat);
   const [inspected, setInspected] = useState('');
-  const playing = usePlaying() === playKey;
+  const playback = usePlayback();
+  const active = playback.key === playKey;
+  const playing = active && !playback.paused;
+  const paused = active && playback.paused;
   const { bar: liveBar, step: liveStep } = usePosition();
   const [selected, setSelected] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -39,7 +42,7 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
   // Load this screen's sounds up front so the first Play is instant.
   const loopIds = useMemo(() => Array.from(new Set([...loops.map((l) => l.id), ...Object.values(beat.place).flatMap((m) => Object.values(m))])), [loops, beat.place]);
   useEffect(() => { engine.loadLoops(loopIds); engine.loadKits(); }, [engine, loopIds]);
-  useEffect(() => { if (playing) engine.setBeat(beat); }, [engine, beat, playing]);
+  useEffect(() => { if (active) engine.setBeat(beat); }, [engine, beat, active]);
   useEffect(() => () => { stopAll(); }, []);
 
   const edit = (fn: (b: Beat) => void) => {
@@ -82,10 +85,12 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
       <section className="panel" aria-labelledby="loops-title">
         <div className="panel-head">
           <div className="row" style={{ gap: 12 }}>
-            <button type="button" className={`btn ${playing ? 'btn-dark' : 'btn-primary'} btn-play`} onClick={() => playBeat(playKey, beat)}
-              aria-label={playing ? 'Stop beat' : 'Play beat'} aria-pressed={playing}>
-              {playing ? <StopIcon /> : <PlayIcon />}
+            <button type="button" className={`btn ${playing ? 'btn-dark' : 'btn-primary'} btn-play`} onClick={() => toggleStudioPlayback(playKey, beat)}
+              aria-label={playing ? 'Pause beat' : paused ? 'Resume beat' : 'Play beat'} aria-pressed={playing}>
+              {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
+            <button type="button" className="btn" onClick={stopAll} aria-label="Stop beat and return to start"><StopIcon /></button>
+            <span className="muted mono" role="status">{paused ? 'Paused' : playing ? 'Playing' : 'Ready'} · Bar {active && liveBar >= 0 ? liveBar + 1 : 1}/{BARS}</span>
             <h2 id="loops-title">{loopsTitle}</h2>
             {loopsHint && <span className="hint">{loopsHint}</span>}
           </div>
@@ -124,7 +129,7 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
         <div className="scroll-x" style={{ '--arrangement-bars': BARS } as CSSProperties}>
           <div className="grid-row" aria-hidden="true">
             <div />
-            {Array.from({ length: BARS }, (_, b) => <div key={b} className="bar-head" data-live={playing && liveBar === b}>{b + 1}</div>)}
+            {Array.from({ length: BARS }, (_, b) => <div key={b} className="bar-head" data-live={active && liveBar === b}>{b + 1}</div>)}
           </div>
           {LANES.map((lane) => (
             <div key={lane.id} className="grid-row" role="group" aria-label={`${lane.label} lane`}>
@@ -132,7 +137,7 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
               {Array.from({ length: BARS }, (_, b) => {
                 const id = beat.place[lane.id][String(b)];
                 const def = id ? LOOP_BY_ID[id] : null;
-                const live = playing && liveBar === b;
+                const live = active && liveBar === b;
                 const target = !!(canEdit && ((selLoop && selLoop.lane === lane.id) || (dragId && LOOP_BY_ID[dragId]?.lane === lane.id)));
                 return (
                   <div key={b} className="cell"
@@ -162,7 +167,7 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
           <div className="grid-row" role="group" aria-label="Drums on or off per bar">
             <div className="lane-label"><span className="dot" style={{ background: 'var(--ink)' }} />Drums</div>
             {beat.drumOn.map((on, b) => (
-              <button key={b} type="button" className="pad" data-live={playing && liveBar === b} data-beat="true" disabled={!canEdit}
+              <button key={b} type="button" className="pad" data-live={active && liveBar === b} data-beat="true" disabled={!canEdit}
                 aria-pressed={on} aria-label={`Drums in bar ${b + 1}`} onClick={() => edit((x) => { x.drumOn[b] = !x.drumOn[b]; })}>
                 <span className={on ? 'on' : 'off'} style={on ? { background: 'var(--ink)', width: 18, height: 18 } : undefined} />
               </button>
@@ -198,7 +203,7 @@ export function Studio({ playKey, beat, onChange, loops, canEdit, actions, loops
               <div className="lane-label">{r.label}</div>
               {beat.steps[r.id].map((v, i) => (
                 <button key={i} type="button" className="pad pad-lg" disabled={!canEdit}
-                  data-live={playing && liveStep === i && beat.drumOn[liveBar]} data-beat={i % 4 === 0}
+                  data-live={active && liveStep === i && beat.drumOn[liveBar]} data-beat={i % 4 === 0}
                   aria-pressed={!!v} aria-label={`${r.label} step ${i + 1}`} onClick={() => toggleStep(r.id, i)}>
                   <span className={v ? 'on' : 'off'} style={v ? { background: r.color } : undefined} />
                 </button>
